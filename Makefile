@@ -4,7 +4,23 @@ ifeq ($(UNAME), Linux)
    special = -lpthread
 endif
 
+GREPPED = $(shell grep -sao jetson /proc/device-tree/compatible)
+ifneq ("$(strip $(GREPPED))", "")
+   $(info Nvidia Jetson Detected)
+   SERVER_DEB_PLATFORM = jetson
+else ifneq ("$(wildcard /etc/rpi-issue)","")
+   $(info Raspberry Pi Detected)
+   SERVER_DEB_PLATFORM = pi
+else
+   SERVER_DEB_PLATFORM = generic
+endif
+SERVER_DEB_VER = 0.1
+
 LIB_FILES = cameraserver.cpp
+
+default: cubeeyeserver intelrealserver royaleserver
+
+all: default opencv
 
 setupmacos: macos.sh
 	./macos.sh
@@ -20,3 +36,18 @@ royaleserver: royaleserver.cpp $(LIB_FILES)
 
 opencvserver: opencvserver.cpp $(LIB_FILES)
 	g++ -g -std=c++17 opencvserver.cpp $(LIB_FILES) `pkg-config --cflags --libs opencv4 libhttpserver` $(special) -o opencvserver
+
+deb: default
+	rm -rf packaging/work/ && mkdir packaging/work/
+	cp -r packaging/viam-camera-servers-$(SERVER_DEB_VER)/ packaging/work/viam-camera-servers-$(SERVER_DEB_PLATFORM)-$(SERVER_DEB_VER)/
+	install -D cubeeyeserver packaging/work/viam-camera-servers-$(SERVER_DEB_PLATFORM)-$(SERVER_DEB_VER)/usr/bin/cubeeyeserver
+	install -D intelrealserver packaging/work/viam-camera-servers-$(SERVER_DEB_PLATFORM)-$(SERVER_DEB_VER)/usr/bin/intelrealserver
+	install -D royaleserver packaging/work/viam-camera-servers-$(SERVER_DEB_PLATFORM)-$(SERVER_DEB_VER)/usr/bin/royaleserver
+	cd packaging/work/viam-camera-servers-$(SERVER_DEB_PLATFORM)-$(SERVER_DEB_VER)/ \
+	&& sed -i "s/viam-camera-servers/viam-camera-servers-$(SERVER_DEB_PLATFORM)/g" debian/control debian/changelog \
+	&& dch -v $(SERVER_DEB_VER)+`date -u '+%Y%m%d%H%M'` "Auto-build from commit `git log --pretty=format:'%h' -n 1`" \
+	&& dch -r viam \
+	&& dpkg-buildpackage -us -uc -b \
+
+clean:
+	rm -f cubeeyeserver intelrealserver royaleserver opencvserver
