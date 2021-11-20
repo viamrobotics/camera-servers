@@ -2,18 +2,28 @@
 
 ## Dependencies
 * [libhttpserver](https://github.com/etr/libhttpserver)
+  * Needed for all camera servers
 * [librealsense](https://github.com/IntelRealSense/librealsense)
+  * Needed only for Intel RealSense cameras
   * https://github.com/IntelRealSense/librealsense/blob/master/doc/distribution_linux.md
-    
-## Installation Instructions
+* [libroyale](https://pmdtec.com/picofamily/software/)
+  * Needed only for PMDTEC cameras
+* [libCubeEye](http://cube-eye.co.kr/en/#/support/main.asp?sub=download)
+  * Needed only for CubeEye cameras
+* [libopencv](https://opencv.org/releases/)
+  * In most apt repos `sudo apt install libopencv-dev`
+  * Needed only for OpenCV server
 
-### macOS
+## Installation Instructions
+Run `make` after dependencies are installed. Generate a debian package for the default cameras with `make deb`
+
+### macOS dependency install
 Run `make setupmacos`
 
 ### Linux
 **If on Raspberry Pi (Debian):** `sudo apt install xorg-dev`
 
-Installing `librealsense`
+### Installing `librealsense` from source
 ```bash
 sudo apt install libglfw3-dev libusb-1.0-0-dev libgl1-mesa-dev libglu1-mesa-dev
 git clone git@github.com:IntelRealSense/librealsense.git
@@ -24,7 +34,7 @@ make -j 4
 sudo make install
 ```
     
-### Installing `libhttpserver`
+### Installing `libhttpserver` from source
 ```bash
 sudo apt install libmicrohttpd-dev libtool
 git clone git@github.com:etr/libhttpserver.git
