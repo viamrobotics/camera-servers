@@ -48,11 +48,3 @@ sudo make install
 
 ### If none of that works, try this:
 https://github.com/IntelRealSense/librealsense/blob/master/doc/libuvc_installation.md
-
-## Make Intel Realsense service
-```bash
-sudo ln -s ~/work/core/utils/camera_servers/intelrealserver /usr/local/bin
-sudo ln -s ~/work/core/utils/camera_servers/intelrealserver.service /etc/systemd/system/
-sudo systemctl start intelrealserver
-sudo systemctl enable intelrealserver
-```
