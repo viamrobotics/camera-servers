@@ -1,6 +1,4 @@
-#include <CubeEye/CubeEyeBasicFrame.h>
-#include <CubeEye/CubeEyeCamera.h>
-#include <CubeEye/CubeEyeSink.h>
+#include <CubeEye/CubeEye.h>
 #include <assert.h>
 #include <signal.h>
 #include <string.h>
