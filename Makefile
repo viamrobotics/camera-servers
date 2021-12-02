@@ -18,6 +18,10 @@ SERVER_DEB_VER = 0.1
 
 LIB_FILES = cameraserver.cpp
 
+format: *.h *.cpp
+	clang-format -i --style="{BasedOnStyle: Google, IndentWidth: 4}" *.cpp *.h
+
+
 default: cubeeyeserver intelrealserver royaleserver
 
 all: default opencv
