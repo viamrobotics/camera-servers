@@ -22,6 +22,9 @@ default: cubeeyeserver intelrealserver royaleserver
 
 all: default opencv
 
+clean:
+	rm -f cubeeyeserver intelrealserver royaleserver opencvserver
+
 setupmacos: macos.sh
 	./macos.sh
 
@@ -48,5 +51,9 @@ deb: default
 	&& dch --force-distribution -D viam -v $(SERVER_DEB_VER)+`date -u '+%Y%m%d%H%M'` "Auto-build from commit `git log --pretty=format:'%h' -n 1`" \
 	&& dpkg-buildpackage -us -uc -b \
 
-clean:
-	rm -f cubeeyeserver intelrealserver royaleserver opencvserver
+appimages: default
+	rm -rf packaging/out/ && mkdir packaging/out/
+	#cd packaging/cubeeyeserver && appimage-builder --recipe cubeeye.yml
+	cd packaging/intelrealserver && appimage-builder --recipe intel.yml
+	#cd packaging/royaleserver && appimage-builder --recipe royale.yml
+	mv packaging/*/*.AppImage* packaging/out/
