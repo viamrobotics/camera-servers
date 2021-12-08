@@ -23,7 +23,10 @@ default: cubeeyeserver intelrealserver royaleserver
 all: default opencv
 
 clean:
-	rm -f cubeeyeserver intelrealserver royaleserver opencvserver
+	rm -rf cubeeyeserver intelrealserver royaleserver opencvserver
+
+clean-all: clean
+	rm -rf packaging/deploy packaging/appimages/appimage-builder-cache
 
 setupmacos: macos.sh
 	./macos.sh
@@ -51,9 +54,17 @@ deb: default
 	&& dch --force-distribution -D viam -v $(SERVER_DEB_VER)+`date -u '+%Y%m%d%H%M'` "Auto-build from commit `git log --pretty=format:'%h' -n 1`" \
 	&& dpkg-buildpackage -us -uc -b \
 
-appimages: default
-	rm -rf packaging/out/ && mkdir packaging/out/
-	#cd packaging/cubeeyeserver && appimage-builder --recipe cubeeye.yml
-	cd packaging/intelrealserver && appimage-builder --recipe intel.yml
-	#cd packaging/royaleserver && appimage-builder --recipe royale.yml
-	mv packaging/*/*.AppImage* packaging/out/
+appimages: clean default
+	mkdir -p packaging/deploy
+	cd packaging/appimages && appimage-builder --recipe cubeeyeserver-`uname -m`.yml
+	cd packaging/appimages && appimage-builder --recipe intelrealserver-`uname -m`.yml
+	cd packaging/appimages && appimage-builder --recipe royaleserver-`uname -m`.yml
+	mv packaging/appimages/*.AppImage* packaging/deploy/
+
+appimages-multiarch:
+	docker run --platform linux/amd64 -v`pwd`:/tmp/host --workdir /tmp/host --rm -ti ghcr.io/viamrobotics/appimage:amd64 "make appimages"
+	docker run --platform linux/arm64 -v`pwd`:/tmp/host --workdir /tmp/host --rm -ti ghcr.io/viamrobotics/appimage:arm64 "make appimages"
+	sudo chown -R --reference=./ ./
+
+deploy: appimages-multiarch
+	gsutil -m -h "Cache-Control: no-cache" cp packaging/deploy/* gs://packages.viam.com/apps/camera-servers/

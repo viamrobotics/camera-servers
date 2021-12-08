@@ -1,0 +1,46 @@
+# appimage-builder recipe see https://appimage-builder.readthedocs.io for details
+version: 1
+script:
+ - rm -rf AppDir | true
+ - mkdir -p $APPDIR/usr/bin
+ - cp ../../royaleserver $APPDIR/usr/bin/
+ - mkdir -p $APPDIR/usr/share/icons/viam/96x96/apps/
+ - cp ./viam-server.png $APPDIR/usr/share/icons/viam/96x96/apps/viam-server.png
+ - mkdir -p $APPDIR/usr/lib
+ - cp `which appimage-update` $APPDIR/usr/bin/
+ - cp ./util.sh $APPDIR/usr/bin/
+ - chmod 755 $APPDIR/usr/bin/*
+
+AppDir:
+  path: ./AppDir
+  app_info:
+    id: com.viam.royaleserver
+    name: royaleserver
+    icon: viam-server
+    version: latest
+    exec: bin/bash
+    exec_args: "$APPDIR/usr/bin/util.sh $@"
+  apt:
+    arch:
+    - arm64
+    allow_unauthenticated: true
+    sources:
+    - sourceline: deb [trusted=yes] http://deb.debian.org/debian bullseye main
+    - sourceline: deb [trusted=yes] http://deb.debian.org/debian-security bullseye-security main
+    - sourceline: deb [trusted=yes] http://deb.debian.org/debian bullseye-updates main
+    - sourceline: deb [trusted=yes] http://packages.viam.com/debian viam/
+    include:
+    - bash:arm64
+    - libhttpserver1:arm64
+    - libroyale3:arm64
+  files:
+    include: []
+    exclude:
+    - usr/share/man
+    - usr/share/doc
+  runtime:
+    env:
+        MAIN_PROG: $APPDIR/usr/bin/royaleserver
+AppImage:
+  arch: aarch64
+  update-information: zsync|http://packages.viam.com/apps/camera-servers/royaleserver-latest-aarch64.AppImage.zsync

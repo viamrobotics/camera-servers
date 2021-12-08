@@ -20,7 +20,7 @@ done
 if [[ -v $UPDATE ]]
 then
 	echo "SMURF UPDATE: $APPIMAGE"
-	$APPDIR/usr/bin/appimage-update $APPIMAGE
+	$APPDIR/usr/bin/appimage-update "$APPIMAGE"
 	exit
 fi
 

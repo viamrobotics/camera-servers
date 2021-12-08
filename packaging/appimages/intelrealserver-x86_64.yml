@@ -1,0 +1,49 @@
+# appimage-builder recipe see https://appimage-builder.readthedocs.io for details
+version: 1
+script:
+ - rm -rf AppDir | true
+ - mkdir -p $APPDIR/usr/bin
+ - cp ../../intelrealserver $APPDIR/usr/bin/
+ - mkdir -p $APPDIR/usr/share/icons/viam/96x96/apps/
+ - cp ./viam-server.png $APPDIR/usr/share/icons/viam/96x96/apps/viam-server.png
+# - cp `which appimage-update` $APPDIR/usr/bin/
+# - mkdir -p $APPDIR/usr/lib
+# - cp ./libappimageupdate.so $APPDIR/usr/lib/
+ - cp ./util.sh $APPDIR/usr/bin/
+ - chmod 755 $APPDIR/usr/bin/*
+
+AppDir:
+  path: ./AppDir
+  app_info:
+    id: com.viam.intelrealserver
+    name: intelrealserver
+    icon: viam-server
+    version: latest
+    exec: bin/bash
+    exec_args: "$APPDIR/usr/bin/util.sh $@"
+  apt:
+    arch:
+    - amd64
+    allow_unauthenticated: true
+    sources:
+    - sourceline: deb [trusted=yes] http://deb.debian.org/debian bullseye main
+    - sourceline: deb [trusted=yes] http://deb.debian.org/debian-security bullseye-security main
+    - sourceline: deb [trusted=yes] http://deb.debian.org/debian bullseye-updates main
+    - sourceline: deb [trusted=yes] http://packages.viam.com/debian viam/
+    include:
+    - bash:amd64
+    - libhttpserver1:amd64
+    - librealsense2:amd64
+    - appimageupdatetool:amd64
+  files:
+    include: []
+    exclude:
+    - usr/share/man
+    - usr/share/doc
+  runtime:
+    env:
+        MAIN_PROG: $APPDIR/usr/bin/intelrealserver
+AppImage:
+  arch: x86_64
+  #update-information: zsync|http://localhost:8100/intelrealserver-latest-x86_64.AppImage.zsync
+  update-information: zsync|http://packages.viam.com/apps/camera-servers/intelrealserver-latest-x86_64.AppImage.zsync
