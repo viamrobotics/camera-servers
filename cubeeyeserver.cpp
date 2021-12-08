@@ -1,4 +1,8 @@
-#include <CubeEye/CubeEye.h>
+// clang-format off
+#include <CubeEye/CubeEyeSink.h>
+#include <CubeEye/CubeEyeBasicFrame.h>
+// clang-format on
+
 #include <assert.h>
 #include <signal.h>
 #include <string.h>
@@ -370,7 +374,7 @@ int main(int argc, char* argv[]) {
 
         webServerTOF.start(false);  // start the webserver without using
                                     // blocking
-        while (!TOFdone) {  // keep going until we stop
+        while (!TOFdone) {          // keep going until we stop
             std::this_thread::sleep_for(std::chrono::milliseconds(200));
             // if an error in the camera occurs(sometimes timeout error on
             // startup) restart the camera
