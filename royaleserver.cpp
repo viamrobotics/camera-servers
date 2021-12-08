@@ -28,7 +28,7 @@ class MyListener : public IDepthDataListener {
             auto val = data->points.at(k);
 
             DEBUG("\t" << x << "," << y << " " << k << " z:" << val.z
-                  << " confidence:" << int(val.depthConfidence));
+                       << " confidence:" << int(val.depthConfidence));
         }
 
         std::shared_ptr<CameraOutput> output(new CameraOutput());

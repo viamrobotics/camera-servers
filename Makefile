@@ -18,6 +18,9 @@ SERVER_DEB_VER = 0.1
 
 LIB_FILES = cameraserver.cpp
 
+format: *.h *.cpp
+	clang-format -i --style="{BasedOnStyle: Google, IndentWidth: 4}" *.cpp *.h
+
 default: cubeeyeserver intelrealserver royaleserver
 
 all: default opencv
@@ -32,7 +35,7 @@ setupmacos: macos.sh
 	./macos.sh
 
 cubeeyeserver: cubeeyeserver.cpp $(LIB_FILES)
-	g++ -g -std=c++11 cubeeyeserver.cpp $(LIB_FILES) `pkg-config --cflags --libs libhttpserver cubeeye` $(special) -o cubeeyeserver
+	g++ -g -std=c++17 cubeeyeserver.cpp $(LIB_FILES) `pkg-config --cflags --libs libhttpserver cubeeye` $(special) -o cubeeyeserver
 
 intelrealserver: intelrealserver.cpp $(LIB_FILES)
 	g++ -g -std=c++17 intelrealserver.cpp $(LIB_FILES) `pkg-config --cflags --libs realsense2 libhttpserver` $(special) -o intelrealserver
