@@ -115,8 +115,8 @@ class MyListener : public meere::sensor::sink,
                         meere::sensor::CubeEyeFrame::FrameType_Depth) {
                         // setting min/max based off exp values. didnt like the
                         // idea of constantly changing upper and lower bound
-                        float max = 2200;  // 0;//
-                        float min = 120;   // 100000;//
+                        float max = 0;//
+                        float min = 100000;//
                         // 16bits data type
                         if (it->frameDataType() ==
                             meere::sensor::CubeEyeData::DataType_16U) {
@@ -188,13 +188,13 @@ class MyListener : public meere::sensor::sink,
 
                                     char clr = 0;
                                     // scale depth measurement between
-                                    // ~0-255(ish)(assuming)
+                                    // ~0-255
                                     if (val > 0) {
                                         auto ratio = (val - min) / span;
                                         clr = (char)(60 +
                                                      (int)(ratio *
-                                                           192));  // need to
-                                                                   // calibrate?
+                                                           192));  
+                                                                   
                                         // force bounds(just in case)
                                         if (clr > 255) clr = 255;
                                         if (clr < 0) clr = 0;
@@ -379,7 +379,7 @@ int main(int argc, char* argv[]) {
             // if an error in the camera occurs(sometimes timeout error on
             // startup) restart the camera
             if (TOFerror) {
-                std::cerr << "Restarting Camera to Fix " << endl;
+                std::cerr << "Restarting Cube Eye to Fix " << endl;
                 _camera->stop();
 
                 _rt = _camera->run(wantedFrame);
