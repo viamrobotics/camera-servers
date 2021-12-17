@@ -9,7 +9,7 @@ on:
 
 jobs:
   appimages_amd64:
-    name: [amd64] Camera Server AppImages
+    name: (x64) Camera Server AppImages
     runs-on: qemu-host
 
     steps:
@@ -35,7 +35,7 @@ jobs:
         gzip: false
 
   appimages_arm64:
-    name: [arm64] Camera Server AppImages
+    name: (arm64) Camera Server AppImages
     runs-on: qemu-host
 
     steps:
