@@ -6,11 +6,10 @@ script:
  - cp ../../cubeeyeserver $APPDIR/usr/bin/
  - mkdir -p $APPDIR/usr/share/icons/viam/96x96/apps/
  - cp ./viam-server.png $APPDIR/usr/share/icons/viam/96x96/apps/viam-server.png
- - mkdir -p $APPDIR/usr/lib
- - cp `which appimage-update` $APPDIR/usr/bin/
- - cp ./util.sh $APPDIR/usr/bin/
+ - go install github.com/Otterverse/aix@latest
+ - cp `go env GOPATH`/bin/aix $APPDIR/usr/bin/
  - chmod 755 $APPDIR/usr/bin/*
- - cd $APPDIR/usr/lib && ln -s libCubeEye.so.1 libCubeEye.so
+ - mkdir -p $APPDIR/usr/lib && cd $APPDIR/usr/lib && ln -s libCubeEye.so.1 libCubeEye.so
 
 AppDir:
   path: ./AppDir
@@ -19,8 +18,8 @@ AppDir:
     name: cubeeyeserver
     icon: viam-server
     version: latest
-    exec: bin/bash
-    exec_args: "$APPDIR/usr/bin/util.sh $@"
+    exec: usr/bin/aix
+    exec_args: $@
   apt:
     arch:
     - amd64
@@ -31,7 +30,6 @@ AppDir:
     - sourceline: deb [trusted=yes] http://deb.debian.org/debian bullseye-updates main
     - sourceline: deb [trusted=yes] http://packages.viam.com/debian viam/
     include:
-    - bash:amd64
     - libhttpserver1:amd64
     - libcubeeye1:amd64
   files:
@@ -41,7 +39,7 @@ AppDir:
     - usr/share/doc
   runtime:
     env:
-        MAIN_PROG: $APPDIR/usr/bin/cubeeyeserver
+        AIX_TARGET: usr/bin/cubeeyeserver
 AppImage:
   arch: x86_64
   update-information: zsync|http://packages.viam.com/apps/camera-servers/cubeeyeserver-latest-x86_64.AppImage.zsync
