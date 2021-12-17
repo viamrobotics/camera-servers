@@ -1,4 +1,5 @@
 UNAME := $(shell uname)
+ENTRYCMD = usermod --uid $(shell id -u) testbot && groupmod --gid $(shell id -g) testbot && sudo -u testbot
 
 ifeq ($(UNAME), Linux)
    special = -lpthread
@@ -26,7 +27,6 @@ format: *.h *.cpp
 all: default opencv
 
 clean:
-	sudo chown -R --reference=./ ./
 	rm -rf cubeeyeserver intelrealserver royaleserver opencvserver
 
 clean-all: clean
@@ -71,10 +71,13 @@ appimages: clean default
 docker-emulation:
 	docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
 
-appimages-multiarch: clean-all
-	docker run --platform linux/amd64 -v`pwd`:/tmp/host --workdir /tmp/host --rm ghcr.io/viamrobotics/appimage:latest "make appimages"
-	docker run --platform linux/arm64 -v`pwd`:/tmp/host --workdir /tmp/host --rm ghcr.io/viamrobotics/appimage:latest "make appimages"
-	sudo chown -R --reference=./ ./
+appimages-multiarch: appimages-amd64 appimages-arm64
 
-appimages-deploy: appimages-multiarch
+appimages-amd64:
+	docker run --platform linux/amd64 -v`pwd`:/host --workdir /host --rm ghcr.io/viamrobotics/appimage:latest "$(ENTRYCMD) make appimages"
+
+appimages-arm64:
+	docker run --platform linux/arm64 -v`pwd`:/host --workdir /host --rm ghcr.io/viamrobotics/appimage:latest "$(ENTRYCMD) make appimages"
+
+appimages-deploy:
 	gsutil -m -h "Cache-Control: no-cache" cp packaging/appimages/deploy/* gs://packages.viam.com/apps/camera-servers/
