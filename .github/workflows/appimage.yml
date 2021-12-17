@@ -41,7 +41,7 @@ jobs:
 
   build_and_pack_arm64:
     name: Build and Package Camera Servers for aarch64
-    needs: build_and_pack_arm64
+    needs: build_and_pack_amd64
     runs-on: qemu-host
     container:
       image: ghcr.io/viamrobotics/appimage:latest
