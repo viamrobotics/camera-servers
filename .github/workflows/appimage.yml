@@ -8,63 +8,16 @@ on:
       - 'README.md'
 
 jobs:
-
-  build_and_pack_amd64:
-    name: Build and Package Camera Servers for x86_64
+  appimages:
+    name: Camera Server AppImages
     runs-on: qemu-host
-    container: 
-      image: ghcr.io/viamrobotics/appimage:latest
-      options: --platform linux/amd64
 
     steps:
-    - name: Test Env
-      run: |
-        echo $PATH
-        env
-        sh -c "cat /etc/*release | grep ^ID"
-
     - name: Checkout Code
       uses: actions/checkout@v2
 
-    - name: Build and package
-      run: |
-        make appimages
-
-    - name: Authorize GCP Upload
-      uses: google-github-actions/auth@v0.4.3
-      with:
-        credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
-
-    - name: Upload Files
-      uses: google-github-actions/upload-cloud-storage@v0.5.0
-      with:
-        headers: "Cache-Control: no-cache"
-        path: 'packaging/appimages/deploy/'
-        destination: 'packages.viam.com/apps/camera-servers/'
-        glob: '*'
-        parent: false
-        gzip: false
-
-  build_and_pack_arm64:
-    name: Build and Package Camera Servers for aarch64
-    runs-on: qemu-host
-    container:
-      image: ghcr.io/viamrobotics/appimage:latest
-      options: --platform linux/arm64
-
-    steps:
-    - name: Test Env
-      run: |
-        echo $PATH
-        env
-        sh -c "cat /etc/*release | grep ^ID"
-
-    - name: Checkout Code
-      uses: actions/checkout@v2
-
-    - name: Build and package
-      run: |
-        make appimages
+    - name: Build and Package
+      run: make appimages-multiarch
 
     - name: Authorize GCP Upload
       uses: google-github-actions/auth@v0.4.3
