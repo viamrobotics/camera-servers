@@ -36,6 +36,7 @@ jobs:
         path: 'packaging/appimages/deploy/'
         destination: 'packages.viam.com/apps/camera-servers/'
         glob: '*'
+        parent: false
 
   build_and_pack_arm64:
     name: Build and Package Camera Servers for aarch64
@@ -64,3 +65,4 @@ jobs:
         path: 'packaging/appimages/deploy/'
         destination: 'packages.viam.com/apps/camera-servers/'
         glob: '*'
+        parent: false
