@@ -37,9 +37,11 @@ jobs:
         destination: 'packages.viam.com/apps/camera-servers/'
         glob: '*'
         parent: false
+        gzip: false
 
   build_and_pack_arm64:
     name: Build and Package Camera Servers for aarch64
+    needs: build_and_pack_arm64
     runs-on: qemu-host
     container:
       image: ghcr.io/viamrobotics/appimage:latest
@@ -66,3 +68,4 @@ jobs:
         destination: 'packages.viam.com/apps/camera-servers/'
         glob: '*'
         parent: false
+        gzip: false
