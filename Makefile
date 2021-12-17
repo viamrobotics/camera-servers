@@ -72,8 +72,8 @@ docker-emulation:
 	docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
 
 appimages-multiarch: clean-all
-	docker run --platform linux/amd64 -v`pwd`:/tmp/host --workdir /tmp/host --rm -ti ghcr.io/viamrobotics/appimage:latest "make appimages"
-	docker run --platform linux/arm64 -v`pwd`:/tmp/host --workdir /tmp/host --rm -ti ghcr.io/viamrobotics/appimage:latest "make appimages"
+	docker run --platform linux/amd64 -v`pwd`:/tmp/host --workdir /tmp/host --rm ghcr.io/viamrobotics/appimage:latest "make appimages"
+	docker run --platform linux/arm64 -v`pwd`:/tmp/host --workdir /tmp/host --rm ghcr.io/viamrobotics/appimage:latest "make appimages"
 	sudo chown -R --reference=./ ./
 
 appimages-deploy: appimages-multiarch
