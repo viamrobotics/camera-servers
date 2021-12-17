@@ -12,8 +12,9 @@ jobs:
   build_and_pack_amd64:
     name: Build and Package Camera Servers for x86_64
     runs-on: qemu-host
-    container: ghcr.io/viamrobotics/appimage:latest
-    container-options: --platform linux/amd64
+    container: 
+      image: ghcr.io/viamrobotics/appimage:latest
+      options: --platform linux/amd64
 
     steps:
     - name: Checkout Code
@@ -39,8 +40,9 @@ jobs:
   build_and_pack_arm64:
     name: Build and Package Camera Servers for aarch64
     runs-on: qemu-host
-    container: ghcr.io/viamrobotics/appimage:latest
-    container-options: --platform linux/arm64
+    container:
+      image: ghcr.io/viamrobotics/appimage:latest
+      options: --platform linux/arm64
 
     steps:
     - name: Checkout Code
