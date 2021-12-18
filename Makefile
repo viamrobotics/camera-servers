@@ -59,7 +59,6 @@ deb: clean default
 	&& dpkg-buildpackage -us -uc -b \
 
 appimages: clean default
-	mkdir -p packaging/deploy
 	cd packaging/appimages && appimage-builder --recipe cubeeyeserver-`uname -m`.yml
 	cd packaging/appimages && appimage-builder --recipe intelrealserver-`uname -m`.yml
 	cd packaging/appimages && appimage-builder --recipe royaleserver-`uname -m`.yml
