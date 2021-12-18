@@ -30,7 +30,7 @@ clean:
 	rm -rf cubeeyeserver intelrealserver royaleserver opencvserver
 
 clean-all: clean
-	rm -rf packaging/appimages/deploy packaging/appimages/appimage-builder-cache packaging/debian/work
+	rm -rf packaging/appimages/deploy packaging/appimages/appimage-builder-cache packaging/appimages/AppDir packaging/debian/work
 
 setupmacos: macos.sh
 	./macos.sh
