@@ -71,7 +71,6 @@ return grpc::Status::OK;
  }
   grpc::Status Status(ServerContext* context, const StatusRequest* request, StatusResponse* response) override {
     (*response->mutable_status()->mutable_cameras())["CubeEye"] = true;
-    // (*response->mutable_status()->mutable_cameras())["CubeEyeDEPTH"] = true;
     return grpc::Status::OK;
   }
 
@@ -82,7 +81,7 @@ class MetadataServiceImpl final : public MetadataService::Service  {
   grpc::Status Resources(ServerContext* context, const ResourcesRequest* request, ResourcesResponse* response) override{
 
     ResourceName* name = response->add_resources();    
-    name->set_namespace_("core");
+    name->set_namespace_("rdk");
     name->set_type("component");
     name->set_subtype("camera");
     name->set_name("CubeEye");
@@ -288,58 +287,6 @@ public:
     }
 
    public:
-
-    void getLensInfo(meere::sensor::sptr_camera camera,
-                     meere::sensor::result _rt) {
-        // get lens parameters
-        {
-            auto _lenses = camera->lenses();
-            std::cout << "count of Lenses : " << _lenses << std::endl;
-            for (size_t i = 0; i < _lenses; i++) {
-                std::cout << "Lens index : " << i << std::endl;
-
-                auto _fov = camera->fov(i);
-                std::cout << "    FoV : " << std::get<0>(_fov) << "(H) x "
-                          << std::get<1>(_fov) << "(V)" << std::endl;
-
-                meere::sensor::IntrinsicParameters parameters;
-                if (meere::sensor::success ==
-                    (_rt = camera->intrinsicParameters(parameters, i))) {
-                    std::cout << "    IntrinsicParameters :" << std::endl;
-                    std::cout
-                        << "        ForcalLength(fx) = " << parameters.forcal.fx
-                        << std::endl;
-                    std::cout
-                        << "        ForcalLength(fy) = " << parameters.forcal.fy
-                        << std::endl;
-                    std::cout << "        PrincipalPoint(cx) = "
-                              << parameters.principal.cx << std::endl;
-                    std::cout << "        PrincipalPoint(cy) = "
-                              << parameters.principal.cy << std::endl;
-                }
-
-                meere::sensor::DistortionCoefficients coefficients;
-                if (meere::sensor::success ==
-                    (_rt = camera->distortionCoefficients(coefficients, i))) {
-                    std::cout << "    DistortionCoefficients :" << std::endl;
-                    std::cout << "        RadialCoefficient(K1) = "
-                              << coefficients.radial.k1 << std::endl;
-                    std::cout << "        RadialCoefficient(K2) = "
-                              << coefficients.radial.k2 << std::endl;
-                    std::cout << "        RadialCoefficient(K3) = "
-                              << coefficients.radial.k3 << std::endl;
-                    std::cout << "        TangentialCoefficient(P1) = "
-                              << coefficients.tangential.p1 << std::endl;
-                    std::cout << "        TangentialCoefficient(P2) = "
-                              << coefficients.tangential.p2 << std::endl;
-                    std::cout << "        skewCoefficient = "
-                              << coefficients.skewCoefficient << std::endl;
-                }
-            }
-        }
-    }
-
-   public:
     CameraServiceImpl() = default;
     virtual ~CameraServiceImpl() = default;
 
@@ -377,30 +324,11 @@ if (argc < 2) {
     meere::sensor::sptr_source_list _source_list =
         meere::sensor::search_camera_source();
 
-    if (nullptr != _source_list) {
-        int i = 0;
-        for (auto it : (*_source_list)) {
-            std::cout << i++ << ") source name : " << it->name()
-                      << ", serialNumber : " << it->serialNumber()
-                      << ", uri : " << it->uri() << std::endl;
-        }
-    }
-    if (nullptr != _source_list && 0 < _source_list->size()) {
-        if (1 < _source_list->size()) {
-            std::cout << "Please enter the desired source number." << std::endl;
-            scanf("%d", &selected_source);
-            getchar();
-        } else {
-            selected_source = 0;
-        }
-    } else {
+    if (nullptr == _source_list){
         std::cerr << "no search device!" << std::endl;
         return -1;
-    }
-
-    if (0 > selected_source) {
-        std::cerr << "invalid selected source number!" << std::endl;
-        return -1;
+    }else{
+        selected_source = 0;
     }
 
     // create ToF camera
