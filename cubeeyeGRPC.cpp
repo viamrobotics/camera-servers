@@ -70,7 +70,8 @@ class RobotServiceImpl final : public RobotService::Service {
 return grpc::Status::OK;
  }
   grpc::Status Status(ServerContext* context, const StatusRequest* request, StatusResponse* response) override {
-    (*response->mutable_status()->mutable_bases())["base1"] = true;
+    (*response->mutable_status()->mutable_cameras())["CubeEye"] = true;
+    // (*response->mutable_status()->mutable_cameras())["CubeEyeDEPTH"] = true;
     return grpc::Status::OK;
   }
 
@@ -95,76 +96,77 @@ class CameraServiceImpl final :  public CameraService::Service,
                                 public meere::sensor::prepared_listener {
  public:
 ::grpc::Status Frame(ServerContext* context, const CameraServiceFrameRequest* request, CameraServiceFrameResponse* response) override{
-    int sanitycnt = 0;
-    char alpha = 255;
     if(mReadFrameThreadStart){
         if (mFrameListQueue.empty()) {
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            }
-            
-            auto _frames = std::move(mFrameListQueue.front());
-            mFrameListQueue.pop();
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+        
+        auto _frames = std::move(mFrameListQueue.front());
+        mFrameListQueue.pop();
 
-            float max = 0;//
-            float min = 100000;//
-            int _frame_index = 0;
-            
-            for (auto itframe : (*_frames)) {
-                
-                
-                if(itframe->frameType() == meere::sensor::CubeEyeFrame::FrameType_Depth){
-                    std::stringbuf buffer;
-                    auto _sptr_basic_frame =meere::sensor::frame_cast_basic16u(itframe);
-                    auto _sptr_frame_data =_sptr_basic_frame->frameData();  // depth data array
-                    response->set_dim_x(_sptr_basic_frame->frameWidth());
-                    response->set_dim_y(_sptr_basic_frame->frameHeight());
-                    response->set_mime_type("image/raw-rgba");
-                    
-                    for (int y = 0; y < _sptr_basic_frame->frameHeight();y++) {
-                        for (int x = 0;x < _sptr_basic_frame->frameWidth();x++) {
-                            _frame_index = y * _sptr_basic_frame->frameWidth() + x;
-                            short s =(*_sptr_frame_data)[_frame_index];
-                                        
-                            if (max < s) max = s;
-                            if (min > s) min = s;
-                            // buffer.sputn((const char*)&s, 2);
-                        }
+        float max = 0;
+        float min = 100000;
+        int _frame_index = 0;
+        
+        for (auto itframe : (*_frames)) {
+             
+            if(itframe->frameType() == meere::sensor::CubeEyeFrame::FrameType_Depth){
+                std::stringbuf buffer;
+                std::ostream os(&buffer);
+                auto _sptr_basic_frame =meere::sensor::frame_cast_basic16u(itframe);
+                auto _sptr_frame_data =_sptr_basic_frame->frameData();  // depth data array
+                int dim_x = _sptr_basic_frame->frameWidth();
+                int dim_y = _sptr_basic_frame->frameHeight();
+                response->set_dim_x(dim_x);
+                response->set_dim_y(dim_y);
+
+                response->set_mime_type("image/both");
+
+                os << "VERSIONX\n";
+                os << "2\n";
+                os << ".001\n";
+                os << dim_x << "\n";
+                os << dim_y << "\n";
+
+                for (int y = 0; y < dim_y;y++) {
+                    for (int x = 0;x < dim_x;x++) {
+                        _frame_index = y * dim_x + x;
+                        short s =(*_sptr_frame_data)[_frame_index];
+                                    
+                        if (max < s) max = s;
+                        if (min > s) min = s;
+                        buffer.sputn((const char*)&s, 2);
                     }
-                    float span = max - min;
-                    for (int y = 0; y < _sptr_basic_frame->frameHeight();y++) {
-                        for (int x = 0;x < _sptr_basic_frame->frameWidth();x++) {
-                            _frame_index = y * _sptr_basic_frame->frameWidth() + x;
-                            short val =(*_sptr_frame_data)[_frame_index];
-                            char clr = 0;
-                            if (val > 0){
-                                auto ratio = (val - min) / span;
-                                clr = (char)(60 + (int)(ratio * 192));  
-                                if (clr > 250) clr = 250;
-                                if (clr < 0) clr = 0;
-                            }
-                            buffer.sputn((const char*)&clr, 1);
-                            buffer.sputn((const char*)&clr, 1);
-                            buffer.sputn((const char*)&clr, 1);
-                            buffer.sputn((const char*)&alpha, 1);
-                            // if (640/2 == x && 480/2 == y) {
-                            //     std::cout << clr << std::endl;
-                            //     std::cout << val << std::endl;
-                            // }
-                        }
-                    }
-                    response->set_frame(buffer.str());
                 }
-            
-                sanitycnt++;
-                // std::cout << sanitycnt << std::endl;
+                float span = max - min;
+                os << "P6\n"
+                << dim_x << " " << dim_y
+                << "\n255\n";
+                for (int y = 0; y < dim_y;y++) {
+                    for (int x = 0;x < dim_x;x++) {
+                        _frame_index = y * dim_x + x;
+                        short val =(*_sptr_frame_data)[_frame_index];
+                        char clr = 0;
+                        if (val > 0){
+                            auto ratio = (val - min) / span;
+                            clr = (char)(60 + (int)(ratio * 192));  
+                            if (clr > 255) clr = 255;
+                            if (clr < 0) clr = 0;
+                        }
+                        os << (char)clr;
+                        os << (char)clr;
+                        os << (char)clr;
+                    }
+                }
+                response->set_frame(buffer.str());
             }
-            
-        // }
+        
+        }
     }
 return grpc::Status::OK;
 }
+
 ::grpc::Status PointCloud(ServerContext* context, const CameraServicePointCloudRequest* request, CameraServicePointCloudResponse* response) override{
-char alpha = 255;
     if(mReadFrameThreadStart){
         if (mFrameListQueue.empty()) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -173,8 +175,8 @@ char alpha = 255;
             auto _frames = std::move(mFrameListQueue.front());
             mFrameListQueue.pop();
 
-            float max = 0;//
-            float min = 100000;//
+            float max = 0;
+            float min = 100000;
             int _frame_index = 0;
             
             for (auto itframe : (*_frames)) {
@@ -228,8 +230,6 @@ char alpha = 255;
                                 float yframe = (*_sptr_frame_dataY)[_frame_index];
                                 float zframe = (*_sptr_frame_dataZ)[_frame_index];
                                 oss << xframe << " " << yframe << " " << zframe << " " << rgb << "\n";
-                                if (x == 640/2 && y == 480/2) 
-                                std::cout << xframe << " " << yframe << " " << zframe << " " << rgb << std::endl;
                             }
                         }
                         response->set_frame(oss.str());
@@ -243,16 +243,15 @@ return grpc::Status::OK;
  virtual std::string name() const { return std::string("CubeEyeServer"); }
  virtual void onCubeEyeCameraState(const meere::sensor::ptr_source source,
                                       meere::sensor::State state) {
-        std::cout << "Camera State = " << state << std::endl;
         if (meere::sensor::State::Running == state) {
-            std::cout << " Running" << std::endl;
+            std::cout << "Camera State = " << state << " Running" << std::endl;
             mReadFrameThreadStart = true;
         } else if (meere::sensor::State::Released == state) {
-            std::cout << " Released" << std::endl;
+            std::cout << "Camera State = " << state << " Released" << std::endl;
         } else if (meere::sensor::State::Prepared == state) {
-            std::cout << " Prepared" << std::endl;
+            std::cout << "Camera State = " << state << " Prepared" << std::endl;
         } else if (meere::sensor::State::Stopped == state) {
-            std::cout << " Stopped" << std::endl;
+            std::cout << "Camera State = " << state << " Stopped" << std::endl;
             mReadFrameThreadStart = false;
         }
     }
@@ -403,8 +402,6 @@ if (argc < 2) {
         std::cerr << "invalid selected source number!" << std::endl;
         return -1;
     }
-
-    // CameraState::get()->cameras.push_back(0);
 
     // create ToF camera
     meere::sensor::result _rt;

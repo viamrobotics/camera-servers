@@ -18,6 +18,18 @@ SERVER_DEB_VER = 0.1
 
 LIB_FILES = cameraserver.cpp
 
+SRCDIR = ./gen
+IFLAGS = -I$(SRCDIR)
+LDFLAGS = -L/usr/local/lib
+GRPCFLAGS = `PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:${PKG_CONFIG_PATH} pkg-config --cflags protobuf grpc` `PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:${PKG_CONFIG_PATH} pkg-config --libs protobuf grpc++`
+OTHER = -pthread -Wl,-lgrpc++_reflection -Wl,-ldl
+SOURCES = $(SRCDIR)/proto/api/v1/robot.grpc.pb.cc $(SRCDIR)/proto/api/v1/robot.pb.cc
+SOURCES += $(SRCDIR)/proto/api/service/v1/metadata.grpc.pb.cc $(SRCDIR)/proto/api/service/v1/metadata.pb.cc
+SOURCES += $(SRCDIR)/proto/api/common/v1/common.grpc.pb.cc $(SRCDIR)/proto/api/common/v1/common.pb.cc
+SOURCES += $(SRCDIR)/proto/api/component/v1/camera.grpc.pb.cc $(SRCDIR)/proto/api/component/v1/camera.pb.cc
+SOURCES += $(SRCDIR)/google/api/annotations.pb.cc $(SRCDIR)/google/api/httpbody.pb.cc
+SOURCES += $(SRCDIR)/google/api/http.pb.cc
+
 format: *.h *.cpp
 	clang-format -i --style="{BasedOnStyle: Google, IndentWidth: 4}" *.cpp *.h
 
@@ -28,6 +40,12 @@ all: default opencv
 
 setupmacos: macos.sh
 	./macos.sh
+	
+setupgrpc:
+	bash etc/setup.sh
+
+cubeeyegrpc: cubeeyeGRPC.cpp $(LIB_FILES)
+	g++ -g -std=c++17 cubeeyeGRPC.cpp $(LIB_FILES) `pkg-config --cflags --libs libhttpserver cubeeye` $(SOURCES) $(IFLAGS) $(LDFLAGS) $(GRPCFLAGS) $(OTHER) -o cubeeyegrpcserver
 
 cubeeyeserver: cubeeyeserver.cpp $(LIB_FILES)
 	g++ -g -std=c++17 cubeeyeserver.cpp $(LIB_FILES) `pkg-config --cflags --libs libhttpserver cubeeye` $(special) -o cubeeyeserver

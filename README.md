@@ -13,7 +13,8 @@
 * [libopencv](https://opencv.org/releases/)
   * In most apt repos `sudo apt install libopencv-dev`
   * Needed only for OpenCV server
-
+* [openssl]
+  * Needed for CubeEye gRPC server
 ## Installation Instructions
 Run `make` after dependencies are installed. Generate a debian package for the default cameras with `make deb`
 
@@ -48,3 +49,9 @@ sudo make install
 
 ### If none of that works, try this:
 https://github.com/IntelRealSense/librealsense/blob/master/doc/libuvc_installation.md
+
+### CubeEye gRPC C++ Dependencies(Linux)
+sudo apt-get install libssl-dev
+* Run `make setupgrpc`
+* copy over gen files from a working gRPC C++ setup
+* Run `make cubeeyegrpc`
