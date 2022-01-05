@@ -1,4 +1,4 @@
-name: Package Viam Camera Servers
+name: Build Debian Camera Servers Package
 
 on:
   workflow_dispatch:
