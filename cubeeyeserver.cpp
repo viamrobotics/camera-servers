@@ -35,17 +35,16 @@ class MyListener : public meere::sensor::sink,
 
     virtual void onCubeEyeCameraState(const meere::sensor::ptr_source source,
                                       meere::sensor::State state) {
-        std::cout << "Camera State = " << state << std::endl;
         if (meere::sensor::State::Running == state) {
-            std::cout << " Running" << std::endl;
+            std::cout << "Camera State = " << state << " Running" << std::endl;
             mReadFrameThreadStart = true;
             mReadFrameThread = std::thread(MyListener::ReadFrameProc, this);
         } else if (meere::sensor::State::Released == state) {
-            std::cout << " Released" << std::endl;
+            std::cout << "Camera State = " << state << " Released" << std::endl;
         } else if (meere::sensor::State::Prepared == state) {
-            std::cout << " Prepared" << std::endl;
+            std::cout << "Camera State = " << state << " Prepared" << std::endl;
         } else if (meere::sensor::State::Stopped == state) {
-            std::cout << " Stopped" << std::endl;
+            std::cout << "Camera State = " << state << " Stopped" << std::endl;
             mReadFrameThreadStart = false;
             if (mReadFrameThread.joinable()) {
                 mReadFrameThread.join();
@@ -113,10 +112,9 @@ class MyListener : public meere::sensor::sink,
 
                     if (it->frameType() ==
                         meere::sensor::CubeEyeFrame::FrameType_Depth) {
-                        // setting min/max based off exp values. didnt like the
-                        // idea of constantly changing upper and lower bound
-                        float max = 0;//
-                        float min = 100000;//
+
+                        float max = 0;
+                        float min = 100000;
                         // 16bits data type
                         if (it->frameDataType() ==
                             meere::sensor::CubeEyeData::DataType_16U) {
@@ -130,14 +128,14 @@ class MyListener : public meere::sensor::sink,
                             // frame data
                             output->width = _sptr_basic_frame->frameWidth();
                             output->height = _sptr_basic_frame->frameHeight();
-
+                            
                             // depth data
                             {
                                 std::stringbuf buffer;
                                 std::ostream os(&buffer);
                                 os << "VERSIONX\n";
                                 os << "2\n";
-                                os << "1\n";
+                                os << ".001\n";
                                 os << output->width << "\n";
                                 os << output->height << "\n";
                                 for (int y = 0;
@@ -191,10 +189,8 @@ class MyListener : public meere::sensor::sink,
                                     // ~0-255
                                     if (val > 0) {
                                         auto ratio = (val - min) / span;
-                                        clr = (char)(60 +
-                                                     (int)(ratio *
-                                                           192));  
-                                                                   
+                                        clr = (char)(60 + (int)(ratio * 192));
+
                                         // force bounds(just in case)
                                         if (clr > 255) clr = 255;
                                         if (clr < 0) clr = 0;
@@ -218,56 +214,6 @@ class MyListener : public meere::sensor::sink,
                 }
                 CameraState::get()->cameras[0] = output;
                 CameraState::get()->ready = 1;
-            }
-        }
-    }
-
-    void getLensInfo(meere::sensor::sptr_camera camera,
-                     meere::sensor::result _rt) {
-        // get lens parameters
-        {
-            auto _lenses = camera->lenses();
-            std::cout << "count of Lenses : " << _lenses << std::endl;
-            for (size_t i = 0; i < _lenses; i++) {
-                std::cout << "Lens index : " << i << std::endl;
-
-                auto _fov = camera->fov(i);
-                std::cout << "    FoV : " << std::get<0>(_fov) << "(H) x "
-                          << std::get<1>(_fov) << "(V)" << std::endl;
-
-                meere::sensor::IntrinsicParameters parameters;
-                if (meere::sensor::success ==
-                    (_rt = camera->intrinsicParameters(parameters, i))) {
-                    std::cout << "    IntrinsicParameters :" << std::endl;
-                    std::cout
-                        << "        ForcalLength(fx) = " << parameters.forcal.fx
-                        << std::endl;
-                    std::cout
-                        << "        ForcalLength(fy) = " << parameters.forcal.fy
-                        << std::endl;
-                    std::cout << "        PrincipalPoint(cx) = "
-                              << parameters.principal.cx << std::endl;
-                    std::cout << "        PrincipalPoint(cy) = "
-                              << parameters.principal.cy << std::endl;
-                }
-
-                meere::sensor::DistortionCoefficients coefficients;
-                if (meere::sensor::success ==
-                    (_rt = camera->distortionCoefficients(coefficients, i))) {
-                    std::cout << "    DistortionCoefficients :" << std::endl;
-                    std::cout << "        RadialCoefficient(K1) = "
-                              << coefficients.radial.k1 << std::endl;
-                    std::cout << "        RadialCoefficient(K2) = "
-                              << coefficients.radial.k2 << std::endl;
-                    std::cout << "        RadialCoefficient(K3) = "
-                              << coefficients.radial.k3 << std::endl;
-                    std::cout << "        TangentialCoefficient(P1) = "
-                              << coefficients.tangential.p1 << std::endl;
-                    std::cout << "        TangentialCoefficient(P2) = "
-                              << coefficients.tangential.p2 << std::endl;
-                    std::cout << "        skewCoefficient = "
-                              << coefficients.skewCoefficient << std::endl;
-                }
             }
         }
     }
@@ -302,25 +248,11 @@ int main(int argc, char* argv[]) {
     meere::sensor::sptr_source_list _source_list =
         meere::sensor::search_camera_source();
 
-    if (nullptr != _source_list) {
-        int i = 0;
-        for (auto it : (*_source_list)) {
-            std::cout << i++ << ") source name : " << it->name()
-                      << ", serialNumber : " << it->serialNumber()
-                      << ", uri : " << it->uri() << std::endl;
-        }
-    }
-    if (nullptr != _source_list && 0 < _source_list->size()) {
-        if (1 < _source_list->size()) {
-            std::cout << "Please enter the desired source number." << std::endl;
-            scanf("%d", &selected_source);
-            getchar();
-        } else {
-            selected_source = 0;
-        }
-    } else {
-        std::cerr << "no search device!" << std::endl;
+    if (nullptr == _source_list) {
+        std::cerr << "no cubeeye device!" << std::endl;
         return -1;
+    } else {
+        selected_source = 0;
     }
 
     if (0 > selected_source) {
