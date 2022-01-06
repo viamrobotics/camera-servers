@@ -13,8 +13,10 @@
 * [libopencv](https://opencv.org/releases/)
   * In most apt repos `sudo apt install libopencv-dev`
   * Needed only for OpenCV server
+* [gRPC] (https://github.com/viamrobotics/rdk/tree/main/grpc/cpp)
+  * Needed for gRPC servers
 * [openssl]
-  * Needed for CubeEye gRPC server
+  * Needed for gRPC servers
 ## Installation Instructions
 Run `make` after dependencies are installed. Generate a debian package for the default cameras with `make deb`
 
