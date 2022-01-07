@@ -112,7 +112,6 @@ class MyListener : public meere::sensor::sink,
 
                     if (it->frameType() ==
                         meere::sensor::CubeEyeFrame::FrameType_Depth) {
-
                         float max = 0;
                         float min = 100000;
                         // 16bits data type
@@ -128,7 +127,7 @@ class MyListener : public meere::sensor::sink,
                             // frame data
                             output->width = _sptr_basic_frame->frameWidth();
                             output->height = _sptr_basic_frame->frameHeight();
-                            
+
                             // depth data
                             {
                                 std::stringbuf buffer;
