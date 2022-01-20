@@ -19,10 +19,12 @@ SERVER_DEB_VER = 0.1
 
 LIB_FILES = cameraserver.cpp
 
-SRCDIR = ./gen
+# Enter your path to the rdk directory here
+RDK_SOURCE_DIR = /home/johnn193/core/grpc/cpp
+SRCDIR = $(RDK_SOURCE_DIR)/gen
 IFLAGS = -I$(SRCDIR)
 LDFLAGS = -L/usr/local/lib
-GRPCFLAGS = `PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:${PKG_CONFIG_PATH} pkg-config --cflags protobuf grpc` `PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:${PKG_CONFIG_PATH} pkg-config --libs protobuf grpc++`
+GRPCFLAGS = `pkg-config --cflags grpc --libs protobuf grpc++`
 OTHER = -pthread -Wl,-lgrpc++_reflection -Wl,-ldl
 SOURCES = $(SRCDIR)/proto/api/v1/robot.grpc.pb.cc $(SRCDIR)/proto/api/v1/robot.pb.cc
 SOURCES += $(SRCDIR)/proto/api/service/v1/metadata.grpc.pb.cc $(SRCDIR)/proto/api/service/v1/metadata.pb.cc

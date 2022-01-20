@@ -53,7 +53,6 @@ sudo make install
 https://github.com/IntelRealSense/librealsense/blob/master/doc/libuvc_installation.md
 
 ### CubeEye gRPC C++ Dependencies(Linux)
-sudo apt-get install libssl-dev
-* Run `make setupgrpc`
-* copy over gen files from a working gRPC C++ setup
+See https://github.com/viamrobotics/rdk/blob/main/grpc/cpp/README.md for setting up required grpc components
+Add path to rdk/grpc/cpp to the Makefile in `RDK_SOURCE_DIR`
 * Run `make cubeeyegrpc`

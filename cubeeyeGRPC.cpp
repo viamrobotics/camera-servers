@@ -72,7 +72,7 @@ class RobotServiceImpl final : public RobotService::Service {
     }
     grpc::Status Status(ServerContext* context, const StatusRequest* request,
                         StatusResponse* response) override {
-        (*response->mutable_status()->mutable_cameras())["CubeEye"] = true;
+        (*response->mutable_status()->mutable_cameras())["Camera1"] = true;
         return grpc::Status::OK;
     }
 };
@@ -248,7 +248,7 @@ class CameraServiceImpl final : public CameraService::Service,
                                 if (val > 0) {
                                     auto ratio = (val - min) / span;
                                     clr = (char)(60 + (int)(ratio * 192));
-                                    if (clr > 250) clr = 250;
+                                    if (clr > 255) clr = 255;
                                     if (clr < 0) clr = 0;
                                 }
                                 int rgb = 0;
@@ -338,15 +338,15 @@ void signal_callback_handler(int signum) {
 }
 
 int main(int argc, char* argv[]) {
-    if (argc < 2) {
-        std::cerr << "must supply grpc address" << std::endl;
-        return 1;
-    }
+    // if (argc < 2) {
+    //     std::cerr << "must supply grpc address" << std::endl;
+    //     return 1;
+    // }
     RobotServiceImpl robotService;
     MetadataServiceImpl metadataService;
     CameraServiceImpl cameraService;
     ServerBuilder builder;
-    builder.AddListeningPort(argv[1], grpc::InsecureServerCredentials());
+    builder.AddListeningPort("localhost:8085", grpc::InsecureServerCredentials());
     builder.RegisterService(&robotService);
     builder.RegisterService(&metadataService);
     builder.RegisterService(&cameraService);
