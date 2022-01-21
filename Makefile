@@ -20,8 +20,8 @@ SERVER_DEB_VER = 0.1
 LIB_FILES = cameraserver.cpp
 
 # Enter your path to the rdk directory here
-RDK_SOURCE_DIR = /home/johnn193/core/grpc/cpp
-SRCDIR = $(RDK_SOURCE_DIR)/gen
+RDK_SOURCE_DIR = ../rdk
+SRCDIR = $(RDK_SOURCE_DIR)/grpc/cpp/gen
 IFLAGS = -I$(SRCDIR)
 LDFLAGS = -L/usr/local/lib
 GRPCFLAGS = `pkg-config --cflags grpc --libs protobuf grpc++`

@@ -86,8 +86,19 @@ class MetadataServiceImpl final : public MetadataService::Service {
         name->set_namespace_("rdk");
         name->set_type("component");
         name->set_subtype("camera");
-        name->set_name("CubeEye");
+        name->set_name("CubeEye Gray");
 
+        ResourceName* name2 = response->add_resources();
+        name2->set_namespace_("rdk");
+        name2->set_type("component");
+        name2->set_subtype("camera");
+        name2->set_name("CubeEye Depth");
+
+        ResourceName* name3 = response->add_resources();
+        name3->set_namespace_("rdk");
+        name3->set_type("component");
+        name3->set_subtype("camera");
+        name3->set_name("CubeEye Both");
         return grpc::Status::OK;
     }
 };
@@ -110,7 +121,8 @@ class CameraServiceImpl final : public CameraService::Service,
             float max = 0;
             float min = 100000;
             int _frame_index = 0;
-
+            auto reqName = request->name();
+            char alpha = 255;
             for (auto itframe : (*_frames)) {
                 if (itframe->frameType() ==
                     meere::sensor::CubeEyeFrame::FrameType_Depth) {
@@ -124,15 +136,21 @@ class CameraServiceImpl final : public CameraService::Service,
                     int dim_y = _sptr_basic_frame->frameHeight();
                     response->set_dim_x(dim_x);
                     response->set_dim_y(dim_y);
+                    if (reqName == "CubeEye Both")
+                        response->set_mime_type("image/both");
+                    if (reqName == "CubeEye Depth")
+                        response->set_mime_type("image/raw-depth");
+                    if (reqName == "CubeEye Gray")
+                        response->set_mime_type("image/raw-rgba");
+                    
 
-                    response->set_mime_type("image/both");
-
+                    if ((reqName == "CubeEye Both")||(reqName == "CubeEye Depth")){
                     os << "VERSIONX\n";
                     os << "2\n";
                     os << ".001\n";
                     os << dim_x << "\n";
                     os << dim_y << "\n";
-
+                    }
                     for (int y = 0; y < dim_y; y++) {
                         for (int x = 0; x < dim_x; x++) {
                             _frame_index = y * dim_x + x;
@@ -140,10 +158,15 @@ class CameraServiceImpl final : public CameraService::Service,
 
                             if (max < s) max = s;
                             if (min > s) min = s;
+                            if ((reqName == "CubeEye Both")||(reqName == "CubeEye Depth")){
                             buffer.sputn((const char*)&s, 2);
+                            }
                         }
+                    
                     }
+                    if ((reqName == "CubeEye Both")||(reqName == "CubeEye Gray")){
                     float span = max - min;
+                    if(reqName == "CubeEye Both")
                     os << "P6\n" << dim_x << " " << dim_y << "\n255\n";
                     for (int y = 0; y < dim_y; y++) {
                         for (int x = 0; x < dim_x; x++) {
@@ -153,13 +176,17 @@ class CameraServiceImpl final : public CameraService::Service,
                             if (val > 0) {
                                 auto ratio = (val - min) / span;
                                 clr = (char)(60 + (int)(ratio * 192));
-                                if (clr > 255) clr = 255;
+                                if (clr > 250) clr = 250;
                                 if (clr < 0) clr = 0;
                             }
                             os << (char)clr;
                             os << (char)clr;
                             os << (char)clr;
+                            if(reqName == "CubeEye Gray")
+                            os << (char)alpha;
                         }
+                    }
+                    
                     }
                     response->set_frame(buffer.str());
                 }
@@ -410,7 +437,7 @@ int main(int argc, char* argv[]) {
         signal(SIGQUIT, signal_callback_handler);
 
         std::unique_ptr<Server> server(builder.BuildAndStart());
-        std::cout << "Server listening on " << argv[1] << std::endl;
+        std::cout << "Server listening on " << "localhost:8085" << std::endl;
         while (!TOFdone) {  // keep going until we stop
             std::this_thread::sleep_for(std::chrono::milliseconds(200));
             // if an error in the camera occurs(sometimes timeout error on
