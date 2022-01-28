@@ -1,5 +1,5 @@
 UNAME := $(shell uname)
-ENTRYCMD = usermod --uid $(shell id -u) testbot && groupmod --gid $(shell id -g) testbot && sudo -u testbot
+ENTRYCMD = --testbot-uid $(shell id -u) --testbot-gid $(shell id -g)
 
 ifeq ($(UNAME), Linux)
    special = -lpthread
@@ -30,7 +30,7 @@ clean:
 	rm -rf cubeeyeserver intelrealserver royaleserver opencvserver
 
 clean-all: clean
-	rm -rf packaging/appimages/deploy packaging/appimages/appimage-builder-cache packaging/appimages/AppDir packaging/debian/work
+	git clean -fxd
 
 setupmacos: macos.sh
 	./macos.sh
@@ -58,7 +58,7 @@ deb: clean default
 	&& dch --force-distribution -D viam -v $(SERVER_DEB_VER)+`date -u '+%Y%m%d%H%M'` "Auto-build from commit `git log --pretty=format:'%h' -n 1`" \
 	&& dpkg-buildpackage -us -uc -b \
 
-appimages: clean default
+appimages: default
 	cd packaging/appimages && appimage-builder --recipe cubeeyeserver-`uname -m`.yml
 	cd packaging/appimages && appimage-builder --recipe intelrealserver-`uname -m`.yml
 	cd packaging/appimages && appimage-builder --recipe royaleserver-`uname -m`.yml
@@ -66,17 +66,7 @@ appimages: clean default
 	mv packaging/appimages/*.AppImage* packaging/appimages/deploy/
 	chmod 755 packaging/appimages/deploy/*.AppImage
 
-# This sets up multi-arch emulation under linux. Run before using multi-arch targets.
-docker-emulation:
-	docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
-
-appimages-multiarch: appimages-amd64 appimages-arm64
-
-appimages-amd64:
-	docker run --platform linux/amd64 -v`pwd`:/host --workdir /host --rm ghcr.io/viamrobotics/appimage:latest "$(ENTRYCMD) make appimages"
-
-appimages-arm64:
-	docker run --platform linux/arm64 -v`pwd`:/host --workdir /host --rm ghcr.io/viamrobotics/appimage:latest "$(ENTRYCMD) make appimages"
-
 appimages-deploy:
 	gsutil -m -h "Cache-Control: no-cache" cp packaging/appimages/deploy/* gs://packages.viam.com/apps/camera-servers/
+
+include *.make
