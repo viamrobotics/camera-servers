@@ -6,7 +6,6 @@ on:
     branches: [ main ]
     paths-ignore:
       - 'README.md'
-      - '*.sh'
 
 jobs:
   build_and_pack_pi:
@@ -27,7 +26,7 @@ jobs:
 
     - name: Add package to repo
       run: |
-        dput local packaging/work/*.changes
+        dput local packaging/debian/work/*.changes
 
     - name: Sync repo to cloud
       run: |
