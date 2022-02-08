@@ -47,10 +47,10 @@ using grpc::ServerReader;
 using grpc::ServerReaderWriter;
 using grpc::ServerWriter;
 using proto::api::component::v1::CameraService;
-using proto::api::component::v1::CameraServiceFrameRequest;
-using proto::api::component::v1::CameraServiceFrameResponse;
-using proto::api::component::v1::CameraServicePointCloudRequest;
-using proto::api::component::v1::CameraServicePointCloudResponse;
+using proto::api::component::v1::CameraServiceGetFrameRequest;
+using proto::api::component::v1::CameraServiceGetFrameResponse;
+using proto::api::component::v1::CameraServiceGetPointCloudRequest;
+using proto::api::component::v1::CameraServiceGetPointCloudResponse;
 using proto::api::service::v1::MetadataService;
 using proto::api::service::v1::ResourceName;
 using proto::api::service::v1::ResourcesRequest;
@@ -86,19 +86,19 @@ class MetadataServiceImpl final : public MetadataService::Service {
         name->set_namespace_("rdk");
         name->set_type("component");
         name->set_subtype("camera");
-        name->set_name("CubeEye Gray");
+        name->set_name("Gray");
 
         ResourceName* name2 = response->add_resources();
         name2->set_namespace_("rdk");
         name2->set_type("component");
         name2->set_subtype("camera");
-        name2->set_name("CubeEye Depth");
+        name2->set_name("Depth");
 
         ResourceName* name3 = response->add_resources();
         name3->set_namespace_("rdk");
         name3->set_type("component");
         name3->set_subtype("camera");
-        name3->set_name("CubeEye Both");
+        name3->set_name("Both");
         return grpc::Status::OK;
     }
 };
@@ -107,9 +107,9 @@ class CameraServiceImpl final : public CameraService::Service,
                                 public meere::sensor::sink,
                                 public meere::sensor::prepared_listener {
    public:
-    ::grpc::Status Frame(ServerContext* context,
-                         const CameraServiceFrameRequest* request,
-                         CameraServiceFrameResponse* response) override {
+    ::grpc::Status GetFrame(ServerContext* context,
+                            const CameraServiceGetFrameRequest* request,
+                            CameraServiceGetFrameResponse* response) override {
         if (mReadFrameThreadStart) {
             if (mFrameListQueue.empty()) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -134,22 +134,20 @@ class CameraServiceImpl final : public CameraService::Service,
                         _sptr_basic_frame->frameData();  // depth data array
                     int dim_x = _sptr_basic_frame->frameWidth();
                     int dim_y = _sptr_basic_frame->frameHeight();
-                    response->set_dim_x(dim_x);
-                    response->set_dim_y(dim_y);
-                    if (reqName == "CubeEye Both")
+                    response->set_width_px(dim_x);
+                    response->set_height_px(dim_y);
+                    if (reqName == "Both")
                         response->set_mime_type("image/both");
-                    if (reqName == "CubeEye Depth")
+                    if (reqName == "Depth")
                         response->set_mime_type("image/raw-depth");
-                    if (reqName == "CubeEye Gray")
+                    if (reqName == "Gray")
                         response->set_mime_type("image/raw-rgba");
-                    
-
-                    if ((reqName == "CubeEye Both")||(reqName == "CubeEye Depth")){
-                    os << "VERSIONX\n";
-                    os << "2\n";
-                    os << ".001\n";
-                    os << dim_x << "\n";
-                    os << dim_y << "\n";
+                    if ((reqName == "Both") || (reqName == "Depth")) {
+                        os << "VERSIONX\n";
+                        os << "2\n";
+                        os << ".001\n";
+                        os << dim_x << "\n";
+                        os << dim_y << "\n";
                     }
                     for (int y = 0; y < dim_y; y++) {
                         for (int x = 0; x < dim_x; x++) {
@@ -158,35 +156,32 @@ class CameraServiceImpl final : public CameraService::Service,
 
                             if (max < s) max = s;
                             if (min > s) min = s;
-                            if ((reqName == "CubeEye Both")||(reqName == "CubeEye Depth")){
-                            buffer.sputn((const char*)&s, 2);
+                            if ((reqName == "Both") || (reqName == "Depth")) {
+                                buffer.sputn((const char*)&s, 2);
                             }
                         }
-                    
                     }
-                    if ((reqName == "CubeEye Both")||(reqName == "CubeEye Gray")){
-                    float span = max - min;
-                    if(reqName == "CubeEye Both")
-                    os << "P6\n" << dim_x << " " << dim_y << "\n255\n";
-                    for (int y = 0; y < dim_y; y++) {
-                        for (int x = 0; x < dim_x; x++) {
-                            _frame_index = y * dim_x + x;
-                            short val = (*_sptr_frame_data)[_frame_index];
-                            char clr = 0;
-                            if (val > 0) {
-                                auto ratio = (val - min) / span;
-                                clr = (char)(60 + (int)(ratio * 192));
-                                if (clr > 250) clr = 250;
-                                if (clr < 0) clr = 0;
+                    if ((reqName == "Both") || (reqName == "Gray")) {
+                        float span = max - min;
+                        if (reqName == "Both")
+                            os << "P6\n" << dim_x << " " << dim_y << "\n255\n";
+                        for (int y = 0; y < dim_y; y++) {
+                            for (int x = 0; x < dim_x; x++) {
+                                _frame_index = y * dim_x + x;
+                                short val = (*_sptr_frame_data)[_frame_index];
+                                char clr = 0;
+                                if (val > 0) {
+                                    auto ratio = (val - min) / span;
+                                    clr = (char)(60 + (int)(ratio * 192));
+                                    if (clr > 250) clr = 250;
+                                    if (clr < 0) clr = 0;
+                                }
+                                os << (char)clr;
+                                os << (char)clr;
+                                os << (char)clr;
+                                if (reqName == "Gray") os << (char)alpha;
                             }
-                            os << (char)clr;
-                            os << (char)clr;
-                            os << (char)clr;
-                            if(reqName == "CubeEye Gray")
-                            os << (char)alpha;
                         }
-                    }
-                    
                     }
                     response->set_frame(buffer.str());
                 }
@@ -195,9 +190,10 @@ class CameraServiceImpl final : public CameraService::Service,
         return grpc::Status::OK;
     }
 
-    ::grpc::Status PointCloud(
-        ServerContext* context, const CameraServicePointCloudRequest* request,
-        CameraServicePointCloudResponse* response) override {
+    ::grpc::Status GetPointCloud(
+        ServerContext* context,
+        const CameraServiceGetPointCloudRequest* request,
+        CameraServiceGetPointCloudResponse* response) override {
         if (mReadFrameThreadStart) {
             if (mFrameListQueue.empty()) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -373,7 +369,8 @@ int main(int argc, char* argv[]) {
     MetadataServiceImpl metadataService;
     CameraServiceImpl cameraService;
     ServerBuilder builder;
-    builder.AddListeningPort("localhost:8085", grpc::InsecureServerCredentials());
+    builder.AddListeningPort("localhost:8085",
+                             grpc::InsecureServerCredentials());
     builder.RegisterService(&robotService);
     builder.RegisterService(&metadataService);
     builder.RegisterService(&cameraService);
@@ -437,7 +434,8 @@ int main(int argc, char* argv[]) {
         signal(SIGQUIT, signal_callback_handler);
 
         std::unique_ptr<Server> server(builder.BuildAndStart());
-        std::cout << "Server listening on " << "localhost:8085" << std::endl;
+        std::cout << "Server listening on "
+                  << "localhost:8085" << std::endl;
         while (!TOFdone) {  // keep going until we stop
             std::this_thread::sleep_for(std::chrono::milliseconds(200));
             // if an error in the camera occurs(sometimes timeout error on
