@@ -23,7 +23,6 @@ LIB_FILES = cameraserver.cpp
 RDK_SOURCE_DIR = ../core
 SRCDIR = $(RDK_SOURCE_DIR)/grpc/cpp/gen
 IFLAGS = -I$(SRCDIR)
-LDFLAGS = -L/usr/local/lib
 GRPCFLAGS = `pkg-config --cflags grpc --libs protobuf grpc++`
 OTHER = -pthread -Wl,-lgrpc++_reflection -Wl,-ldl
 SOURCES = $(SRCDIR)/proto/api/v1/robot.grpc.pb.cc $(SRCDIR)/proto/api/v1/robot.pb.cc
@@ -48,12 +47,9 @@ clean-all: clean
 
 setupmacos: macos.sh
 	./macos.sh
-	
-setupgrpc:
-	bash etc/setup.sh
 
 cubeeyegrpc: cubeeyeGRPC.cpp $(LIB_FILES)
-	g++ -g -std=c++17 cubeeyeGRPC.cpp $(LIB_FILES) `pkg-config --cflags --libs libhttpserver cubeeye` $(SOURCES) $(IFLAGS) $(LDFLAGS) $(GRPCFLAGS) $(OTHER) -o cubeeyegrpcserver
+	g++ -g -std=c++17 cubeeyeGRPC.cpp $(LIB_FILES) `pkg-config --cflags --libs libhttpserver cubeeye` $(SOURCES) $(IFLAGS) $(GRPCFLAGS) $(OTHER) -o cubeeyegrpcserver
 
 cubeeyeserver: cubeeyeserver.cpp $(LIB_FILES)
 	g++ -g -std=c++17 cubeeyeserver.cpp $(LIB_FILES) `pkg-config --cflags --libs libhttpserver cubeeye` $(special) -o cubeeyeserver

@@ -94,11 +94,14 @@ class MetadataServiceImpl final : public MetadataService::Service {
         name2->set_subtype("camera");
         name2->set_name("Depth");
 
-        ResourceName* name3 = response->add_resources();
-        name3->set_namespace_("rdk");
-        name3->set_type("component");
-        name3->set_subtype("camera");
-        name3->set_name("Both");
+        // leaving the both camera commented out for when we add this type to
+        // rdk @JOHN
+
+        // ResourceName* name3 = response->add_resources();
+        //  name3->set_namespace_("rdk");
+        //  name3->set_type("component");
+        //  name3->set_subtype("camera");
+        //  name3->set_name("Both");
         return grpc::Status::OK;
     }
 };
@@ -136,8 +139,8 @@ class CameraServiceImpl final : public CameraService::Service,
                     int dim_y = _sptr_basic_frame->frameHeight();
                     response->set_width_px(dim_x);
                     response->set_height_px(dim_y);
-                    if (reqName == "Both")
-                        response->set_mime_type("image/both");
+                    // if (reqName == "Both")
+                    //     response->set_mime_type("image/both");
                     if (reqName == "Depth")
                         response->set_mime_type("image/raw-depth");
                     if (reqName == "Gray")
@@ -163,8 +166,9 @@ class CameraServiceImpl final : public CameraService::Service,
                     }
                     if ((reqName == "Both") || (reqName == "Gray")) {
                         float span = max - min;
-                        if (reqName == "Both")
-                            os << "P6\n" << dim_x << " " << dim_y << "\n255\n";
+                        // if (reqName == "Both")
+                        //     os << "P6\n" << dim_x << " " << dim_y <<
+                        //     "\n255\n";
                         for (int y = 0; y < dim_y; y++) {
                             for (int x = 0; x < dim_x; x++) {
                                 _frame_index = y * dim_x + x;
