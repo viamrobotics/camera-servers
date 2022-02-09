@@ -19,6 +19,19 @@ SERVER_DEB_VER = 0.1
 
 LIB_FILES = cameraserver.cpp
 
+# Enter your path to the rdk directory here
+RDK_SOURCE_DIR = ../core
+SRCDIR = $(RDK_SOURCE_DIR)/grpc/cpp/gen
+IFLAGS = -I$(SRCDIR)
+GRPCFLAGS = `pkg-config --cflags grpc --libs protobuf grpc++`
+OTHER = -pthread -Wl,-lgrpc++_reflection -Wl,-ldl
+SOURCES = $(SRCDIR)/proto/api/v1/robot.grpc.pb.cc $(SRCDIR)/proto/api/v1/robot.pb.cc
+SOURCES += $(SRCDIR)/proto/api/service/v1/metadata.grpc.pb.cc $(SRCDIR)/proto/api/service/v1/metadata.pb.cc
+SOURCES += $(SRCDIR)/proto/api/common/v1/common.grpc.pb.cc $(SRCDIR)/proto/api/common/v1/common.pb.cc
+SOURCES += $(SRCDIR)/proto/api/component/v1/camera.grpc.pb.cc $(SRCDIR)/proto/api/component/v1/camera.pb.cc
+SOURCES += $(SRCDIR)/google/api/annotations.pb.cc $(SRCDIR)/google/api/httpbody.pb.cc
+SOURCES += $(SRCDIR)/google/api/http.pb.cc
+
 default: cubeeyeserver intelrealserver royaleserver
 
 format: *.h *.cpp
@@ -34,6 +47,9 @@ clean-all: clean
 
 setupmacos: macos.sh
 	./macos.sh
+
+cubeeyegrpc: cubeeyeGRPC.cpp $(LIB_FILES)
+	g++ -g -std=c++17 cubeeyeGRPC.cpp $(LIB_FILES) `pkg-config --cflags --libs libhttpserver cubeeye` $(SOURCES) $(IFLAGS) $(GRPCFLAGS) $(OTHER) -o cubeeyegrpcserver
 
 cubeeyeserver: cubeeyeserver.cpp $(LIB_FILES)
 	g++ -g -std=c++17 cubeeyeserver.cpp $(LIB_FILES) `pkg-config --cflags --libs libhttpserver cubeeye` $(special) -o cubeeyeserver
