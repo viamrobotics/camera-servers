@@ -6,12 +6,10 @@
 
 #include "proto/api/common/v1/common.grpc.pb.h"
 #include "proto/api/common/v1/common.pb.h"
-#include "proto/api/component/v1/camera.grpc.pb.h"
-#include "proto/api/component/v1/camera.pb.h"
-#include "proto/api/service/v1/metadata.grpc.pb.h"
-#include "proto/api/service/v1/metadata.pb.h"
-#include "proto/api/v1/robot.grpc.pb.h"
-#include "proto/api/v1/robot.pb.h"
+#include "proto/api/component/camera/v1/camera.grpc.pb.h"
+#include "proto/api/component/camera/v1/camera.pb.h"
+#include "proto/api/service/metadata/v1/metadata.grpc.pb.h"
+#include "proto/api/service/metadata/v1/metadata.pb.h"
 
 // clang-format off
 #include <CubeEye/CubeEyeSink.h>
@@ -46,36 +44,18 @@ using grpc::ServerContext;
 using grpc::ServerReader;
 using grpc::ServerReaderWriter;
 using grpc::ServerWriter;
-using proto::api::component::v1::CameraService;
-using proto::api::component::v1::CameraServiceGetFrameRequest;
-using proto::api::component::v1::CameraServiceGetFrameResponse;
-using proto::api::component::v1::CameraServiceGetPointCloudRequest;
-using proto::api::component::v1::CameraServiceGetPointCloudResponse;
-using proto::api::service::v1::MetadataService;
-using proto::api::service::v1::ResourceName;
-using proto::api::service::v1::ResourcesRequest;
-using proto::api::service::v1::ResourcesResponse;
-using proto::api::v1::ConfigRequest;
-using proto::api::v1::ConfigResponse;
-using proto::api::v1::RobotService;
-using proto::api::v1::StatusRequest;
-using proto::api::v1::StatusResponse;
+using proto::api::common::v1::ResourceName;
+using proto::api::component::camera::v1::CameraService;
+using proto::api::component::camera::v1::GetFrameRequest;
+using proto::api::component::camera::v1::GetFrameResponse;
+using proto::api::component::camera::v1::GetPointCloudRequest;
+using proto::api::component::camera::v1::GetPointCloudResponse;
+using proto::api::service::metadata::v1::MetadataService;
+using proto::api::service::metadata::v1::ResourcesRequest;
+using proto::api::service::metadata::v1::ResourcesResponse;
 
 std::atomic<bool> TOFdone{false};
 bool TOFerror = false;
-
-class RobotServiceImpl final : public RobotService::Service {
-   public:
-    grpc::Status Config(ServerContext* context, const ConfigRequest* request,
-                        ConfigResponse* response) override {
-        return grpc::Status::OK;
-    }
-    grpc::Status Status(ServerContext* context, const StatusRequest* request,
-                        StatusResponse* response) override {
-        (*response->mutable_status()->mutable_cameras())["Camera1"] = true;
-        return grpc::Status::OK;
-    }
-};
 
 class MetadataServiceImpl final : public MetadataService::Service {
    public:
@@ -111,8 +91,8 @@ class CameraServiceImpl final : public CameraService::Service,
                                 public meere::sensor::prepared_listener {
    public:
     ::grpc::Status GetFrame(ServerContext* context,
-                            const CameraServiceGetFrameRequest* request,
-                            CameraServiceGetFrameResponse* response) override {
+                            const GetFrameRequest* request,
+                            GetFrameResponse* response) override {
         if (mReadFrameThreadStart) {
             if (mFrameListQueue.empty()) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -187,17 +167,16 @@ class CameraServiceImpl final : public CameraService::Service,
                             }
                         }
                     }
-                    response->set_frame(buffer.str());
+                    response->set_image(buffer.str());
                 }
             }
         }
         return grpc::Status::OK;
     }
 
-    ::grpc::Status GetPointCloud(
-        ServerContext* context,
-        const CameraServiceGetPointCloudRequest* request,
-        CameraServiceGetPointCloudResponse* response) override {
+    ::grpc::Status GetPointCloud(ServerContext* context,
+                                 const GetPointCloudRequest* request,
+                                 GetPointCloudResponse* response) override {
         if (mReadFrameThreadStart) {
             if (mFrameListQueue.empty()) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -292,7 +271,7 @@ class CameraServiceImpl final : public CameraService::Service,
                                     << " " << rgb << "\n";
                             }
                         }
-                        response->set_frame(oss.str());
+                        response->set_point_cloud(oss.str());
                     }
                 }
             }
@@ -369,29 +348,26 @@ int main(int argc, char* argv[]) {
     //     std::cerr << "must supply grpc address" << std::endl;
     //     return 1;
     // }
-    RobotServiceImpl robotService;
+
     MetadataServiceImpl metadataService;
     CameraServiceImpl cameraService;
     ServerBuilder builder;
     builder.AddListeningPort("localhost:8085",
                              grpc::InsecureServerCredentials());
-    builder.RegisterService(&robotService);
     builder.RegisterService(&metadataService);
     builder.RegisterService(&cameraService);
     // setup listener thread
     // MyListener listener;
     meere::sensor::add_prepared_listener(&cameraService);
-
     // search ToF camera source
     int selected_source = -1;
     meere::sensor::sptr_source_list _source_list =
         meere::sensor::search_camera_source();
-
-    if (nullptr == _source_list) {
-        std::cerr << "no search device!" << std::endl;
-        return -1;
-    } else {
+    if (nullptr != _source_list && 0 < _source_list->size())
         selected_source = 0;
+    else {
+        std::cerr << "cannot find CubeEye! Try a hard restart. " << std::endl;
+        return -1;
     }
 
     // create ToF camera
