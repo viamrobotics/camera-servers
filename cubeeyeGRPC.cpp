@@ -46,19 +46,19 @@ using grpc::ServerContext;
 using grpc::ServerReader;
 using grpc::ServerReaderWriter;
 using grpc::ServerWriter;
+using proto::api::common::v1::ResourceName;
 using proto::api::component::camera::v1::CameraService;
 using proto::api::component::camera::v1::GetFrameRequest;
 using proto::api::component::camera::v1::GetFrameResponse;
 using proto::api::component::camera::v1::GetPointCloudRequest;
 using proto::api::component::camera::v1::GetPointCloudResponse;
 using proto::api::service::metadata::v1::MetadataService;
-using proto::api::common::v1::ResourceName;
 using proto::api::service::metadata::v1::ResourcesRequest;
 using proto::api::service::metadata::v1::ResourcesResponse;
-using proto::api::service::status::v1::StatusService;
 using proto::api::service::status::v1::GetStatusRequest;
 using proto::api::service::status::v1::GetStatusResponse;
 using proto::api::service::status::v1::Status;
+using proto::api::service::status::v1::StatusService;
 // using proto::api::v1::ConfigRequest;
 // using proto::api::v1::ConfigResponse;
 // using proto::api::v1::RobotService;
@@ -68,17 +68,19 @@ using proto::api::service::status::v1::Status;
 std::atomic<bool> TOFdone{false};
 bool TOFerror = false;
 
-class StatusServiceImpl final : public StatusService::Service{
-  public:
-  grpc::Status GetStatus(ServerContext* context, const GetStatusRequest* request, GetStatusResponse* response) override {
-    Status* status = response->add_status();
+class StatusServiceImpl final : public StatusService::Service {
+   public:
+    grpc::Status GetStatus(ServerContext* context,
+                           const GetStatusRequest* request,
+                           GetStatusResponse* response) override {
+        Status* status = response->add_status();
 
-    status->mutable_name()->set_namespace_("rdk");
-    status->mutable_name()->set_type("component");
-    status->mutable_name()->set_subtype("camera");
-    status->mutable_name()->set_name("myCam");
-    return grpc::Status::OK;
-  }
+        status->mutable_name()->set_namespace_("rdk");
+        status->mutable_name()->set_type("component");
+        status->mutable_name()->set_subtype("camera");
+        status->mutable_name()->set_name("myCam");
+        return grpc::Status::OK;
+    }
 };
 
 class MetadataServiceImpl final : public MetadataService::Service {
@@ -198,10 +200,9 @@ class CameraServiceImpl final : public CameraService::Service,
         return grpc::Status::OK;
     }
 
-    ::grpc::Status GetPointCloud(
-        ServerContext* context,
-        const GetPointCloudRequest* request,
-        GetPointCloudResponse* response) override {
+    ::grpc::Status GetPointCloud(ServerContext* context,
+                                 const GetPointCloudRequest* request,
+                                 GetPointCloudResponse* response) override {
         if (mReadFrameThreadStart) {
             if (mFrameListQueue.empty()) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -389,12 +390,12 @@ int main(int argc, char* argv[]) {
     int selected_source = -1;
     meere::sensor::sptr_source_list _source_list =
         meere::sensor::search_camera_source();
-    if(nullptr != _source_list && 0 < _source_list->size())
+    if (nullptr != _source_list && 0 < _source_list->size())
         selected_source = 0;
     else {
         std::cerr << "cannot find CubeEye! Try a hard restart. " << std::endl;
         return -1;
-    } 
+    }
 
     // create ToF camera
     meere::sensor::result _rt;
