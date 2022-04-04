@@ -10,8 +10,6 @@
 #include "proto/api/component/camera/v1/camera.pb.h"
 #include "proto/api/service/metadata/v1/metadata.grpc.pb.h"
 #include "proto/api/service/metadata/v1/metadata.pb.h"
-#include "proto/api/service/status/v1/status.grpc.pb.h"
-#include "proto/api/service/status/v1/status.pb.h"
 
 // clang-format off
 #include <CubeEye/CubeEyeSink.h>
@@ -55,29 +53,9 @@ using proto::api::component::camera::v1::GetPointCloudResponse;
 using proto::api::service::metadata::v1::MetadataService;
 using proto::api::service::metadata::v1::ResourcesRequest;
 using proto::api::service::metadata::v1::ResourcesResponse;
-using proto::api::service::status::v1::GetStatusRequest;
-using proto::api::service::status::v1::GetStatusResponse;
-using proto::api::service::status::v1::Status;
-using proto::api::service::status::v1::StatusService;
-
 
 std::atomic<bool> TOFdone{false};
 bool TOFerror = false;
-
-class StatusServiceImpl final : public StatusService::Service {
-   public:
-    grpc::Status GetStatus(ServerContext* context,
-                           const GetStatusRequest* request,
-                           GetStatusResponse* response) override {
-        Status* status = response->add_status();
-
-        status->mutable_name()->set_namespace_("rdk");
-        status->mutable_name()->set_type("component");
-        status->mutable_name()->set_subtype("camera");
-        status->mutable_name()->set_name("myCam");
-        return grpc::Status::OK;
-    }
-};
 
 class MetadataServiceImpl final : public MetadataService::Service {
    public:
@@ -370,13 +348,12 @@ int main(int argc, char* argv[]) {
     //     std::cerr << "must supply grpc address" << std::endl;
     //     return 1;
     // }
-    StatusServiceImpl statusService;
+
     MetadataServiceImpl metadataService;
     CameraServiceImpl cameraService;
     ServerBuilder builder;
     builder.AddListeningPort("localhost:8085",
                              grpc::InsecureServerCredentials());
-    builder.RegisterService(&statusService);
     builder.RegisterService(&metadataService);
     builder.RegisterService(&cameraService);
     // setup listener thread
