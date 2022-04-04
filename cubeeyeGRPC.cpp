@@ -59,11 +59,7 @@ using proto::api::service::status::v1::GetStatusRequest;
 using proto::api::service::status::v1::GetStatusResponse;
 using proto::api::service::status::v1::Status;
 using proto::api::service::status::v1::StatusService;
-// using proto::api::v1::ConfigRequest;
-// using proto::api::v1::ConfigResponse;
-// using proto::api::v1::RobotService;
-// using proto::api::v1::StatusRequest;
-// using proto::api::v1::StatusResponse;
+
 
 std::atomic<bool> TOFdone{false};
 bool TOFerror = false;
