@@ -33,6 +33,7 @@ AppDir:
     - libhttpserver1:amd64
     - libcubeeye1:amd64
     - libgrpc++1:amd64
+    - libprotobuf30:amd64
   files:
     include: []
     exclude:
