@@ -1,5 +1,4 @@
 UNAME := $(shell uname)
-ENTRYCMD = --testbot-uid $(shell id -u) --testbot-gid $(shell id -g)
 
 ifeq ($(UNAME), Linux)
    special = -lpthread
@@ -18,19 +17,8 @@ endif
 SERVER_DEB_VER = 0.1
 
 LIB_FILES = cameraserver.cpp
-# Enter your path to the rdk directory here
-RDK_SOURCE_DIR = ../rdk
-SRCDIR = $(RDK_SOURCE_DIR)/grpc/cpp/gen
-IFLAGS = -I$(SRCDIR)
-GRPCFLAGS = `pkg-config --cflags grpc --libs protobuf grpc++`
-OTHER = -pthread -Wl,-lgrpc++_reflection -Wl,-ldl
-SOURCES = $(SRCDIR)/proto/api/service/metadata/v1/metadata.grpc.pb.cc $(SRCDIR)/proto/api/service/metadata/v1/metadata.pb.cc
-SOURCES += $(SRCDIR)/proto/api/common/v1/common.grpc.pb.cc $(SRCDIR)/proto/api/common/v1/common.pb.cc
-SOURCES += $(SRCDIR)/proto/api/component/camera/v1/camera.grpc.pb.cc $(SRCDIR)/proto/api/component/camera/v1/camera.pb.cc
-SOURCES += $(SRCDIR)/google/api/annotations.pb.cc $(SRCDIR)/google/api/httpbody.pb.cc
-SOURCES += $(SRCDIR)/google/api/http.pb.cc
 
-default: cubeeyeserver intelrealserver royaleserver
+default: cubeeyeserver intelrealserver royaleserver cubeeyegrpc
 
 format: *.h *.cpp
 	clang-format -i --style="{BasedOnStyle: Google, IndentWidth: 4}" *.cpp *.h
@@ -38,16 +26,13 @@ format: *.h *.cpp
 all: default opencv
 
 clean:
-	rm -rf cubeeyeserver intelrealserver royaleserver opencvserver
+	rm -rf cubeeyeserver cubeeyegrpcserver intelrealserver royaleserver opencvserver
 
 clean-all: clean
 	git clean -fxd
 
 setupmacos: macos.sh
 	./macos.sh
-
-cubeeyegrpc: cubeeyeGRPC.cpp $(LIB_FILES)
-	g++ -g -std=c++17 cubeeyeGRPC.cpp $(LIB_FILES) `pkg-config --cflags --libs libhttpserver cubeeye` $(SOURCES) $(IFLAGS) $(GRPCFLAGS) $(OTHER) -o cubeeyegrpcserver
 
 cubeeyeserver: cubeeyeserver.cpp $(LIB_FILES)
 	g++ -g -std=c++17 cubeeyeserver.cpp $(LIB_FILES) `pkg-config --cflags --libs libhttpserver cubeeye` $(special) -o cubeeyeserver
@@ -76,6 +61,7 @@ appimages: default
 	cd packaging/appimages && appimage-builder --recipe cubeeyeserver-`uname -m`.yml
 	cd packaging/appimages && appimage-builder --recipe intelrealserver-`uname -m`.yml
 	cd packaging/appimages && appimage-builder --recipe royaleserver-`uname -m`.yml
+	cd packaging/appimages && appimage-builder --recipe cubeeyegrpcserver-`uname -m`.yml
 	mkdir -p packaging/appimages/deploy/
 	mv packaging/appimages/*.AppImage* packaging/appimages/deploy/
 	chmod 755 packaging/appimages/deploy/*.AppImage

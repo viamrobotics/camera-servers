@@ -27,7 +27,7 @@ AppDir:
     - sourceline: deb [trusted=yes] http://deb.debian.org/debian bullseye main
     - sourceline: deb [trusted=yes] http://deb.debian.org/debian-security bullseye-security main
     - sourceline: deb [trusted=yes] http://deb.debian.org/debian bullseye-updates main
-    - sourceline: deb [trusted=yes] http://packages.viam.com/debian viam/
+    - sourceline: deb [trusted=yes] https://us-apt.pkg.dev/projects/static-file-server-310021 bullseye main
     include:
     - libhttpserver1:arm64
     - librealsense2:arm64

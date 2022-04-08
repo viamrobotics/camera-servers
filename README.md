@@ -53,6 +53,13 @@ sudo make install
 https://github.com/IntelRealSense/librealsense/blob/master/doc/libuvc_installation.md
 
 ### CubeEye gRPC C++ Dependencies(Linux)
-See https://github.com/viamrobotics/rdk/blob/main/grpc/cpp/README.md for setting up required grpc components
-Add path to rdk/grpc/cpp to the Makefile in `RDK_SOURCE_DIR`
-* Run `make cubeeyegrpc`
+If you have buf.build access to the viam repo, create an access token and set it as BUF_TOKEN
+* `BUF_TOKEN=<SECRETTOKEN> make buf`
+* `make cubeeyegrpc`
+
+Alternately, if you have RDK github access, you can pull a minimal copy to use.
+* `make pull-rdk`
+* `make cubeeyegrpc`
+
+Lastly, to use a local copy of RDK see https://github.com/viamrobotics/rdk/blob/main/grpc/cpp/README.md for setting up required grpc components and after doing the `make setup buf` in grpc/cpp inside RDK, set `RDK_SOURCE_DIR` appropriately and build.
+* `RDK_SOURCE_DIR=~/source/rdk make cubeeyegrpc`
