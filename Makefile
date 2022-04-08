@@ -46,7 +46,7 @@ royaleserver: royaleserver.cpp $(LIB_FILES)
 opencvserver: opencvserver.cpp $(LIB_FILES)
 	g++ -g -std=c++17 opencvserver.cpp $(LIB_FILES) `pkg-config --cflags --libs opencv4 libhttpserver` $(special) -o opencvserver
 
-deb: clean default
+deb: clean cubeeyeserver intelrealserver royaleserver
 	rm -rf packaging/debian/work/ && mkdir packaging/debian/work/
 	cp -r packaging/debian/viam-camera-servers-$(SERVER_DEB_VER)/ packaging/debian/work/viam-camera-servers-$(SERVER_DEB_PLATFORM)-$(SERVER_DEB_VER)/
 	install -D cubeeyeserver packaging/debian/work/viam-camera-servers-$(SERVER_DEB_PLATFORM)-$(SERVER_DEB_VER)/usr/bin/cubeeyeserver
