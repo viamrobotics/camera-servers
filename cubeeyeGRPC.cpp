@@ -121,7 +121,7 @@ class CameraServiceImpl final : public CameraService::Service,
                     response->set_height_px(dim_y);
                     // if (reqName == "Both")
                     //     response->set_mime_type("image/both");
-                    if (reqName == "Depth")
+                    if ((reqName == "Depth"))
                         response->set_mime_type("image/raw-depth");
                     if (reqName == "Gray")
                         response->set_mime_type("image/raw-rgba");
@@ -188,6 +188,7 @@ class CameraServiceImpl final : public CameraService::Service,
             float max = 0;
             float min = 100000;
             int _frame_index = 0;
+            auto reqName = request->name();
 
             for (auto itframe : (*_frames)) {
                 if (itframe->frameType() ==
@@ -208,7 +209,8 @@ class CameraServiceImpl final : public CameraService::Service,
                         auto _sptr_frame_dataZ =
                             _sptr_pointcloud_frame
                                 ->frameDataZ();  // z-point data array
-                        std::ostringstream oss;
+                        std::stringbuf buffer;
+                        std::ostream oss(&buffer);
                         oss << "VERSION .7\n"
                             << "FIELDS x y z rgb\n"
                             << "SIZE 4 4 4 4\n"
@@ -224,8 +226,7 @@ class CameraServiceImpl final : public CameraService::Service,
                             << _sptr_pointcloud_frame->frameHeight() *
                                    _sptr_pointcloud_frame->frameWidth()
                             << "\n"
-                            << "DATA ascii\n";
-
+                            << "DATA binary\n";
                         for (int y = 0;
                              y < _sptr_pointcloud_frame->frameHeight(); y++) {
                             for (int x = 0;
@@ -267,11 +268,14 @@ class CameraServiceImpl final : public CameraService::Service,
                                     (*_sptr_frame_dataY)[_frame_index];
                                 float zframe =
                                     (*_sptr_frame_dataZ)[_frame_index];
-                                oss << xframe << " " << yframe << " " << zframe
-                                    << " " << rgb << "\n";
+
+                                buffer.sputn((const char*)&xframe, 4);
+                                buffer.sputn((const char*)&yframe, 4);
+                                buffer.sputn((const char*)&zframe, 4);
+                                buffer.sputn((const char*)&rgb, 4);
                             }
                         }
-                        response->set_point_cloud(oss.str());
+                        response->set_point_cloud(buffer.str());
                     }
                 }
             }
@@ -279,6 +283,7 @@ class CameraServiceImpl final : public CameraService::Service,
 
         return grpc::Status::OK;
     }
+
     virtual std::string name() const { return std::string("CubeEyeServer"); }
     virtual void onCubeEyeCameraState(const meere::sensor::ptr_source source,
                                       meere::sensor::State state) {
