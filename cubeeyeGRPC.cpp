@@ -121,7 +121,7 @@ class CameraServiceImpl final : public CameraService::Service,
                     response->set_height_px(dim_y);
                     // if (reqName == "Both")
                     //     response->set_mime_type("image/both");
-                    if ((reqName == "Depth"))
+                    if (reqName == "Depth")
                         response->set_mime_type("image/raw-depth");
                     if (reqName == "Gray")
                         response->set_mime_type("image/raw-rgba");
