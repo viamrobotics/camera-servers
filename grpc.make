@@ -12,7 +12,7 @@ endif
 
 GRPCFLAGS = `pkg-config --cflags grpc --libs protobuf grpc++` -pthread -Wl,-lgrpc++_reflection -Wl,-ldl
 
-SOURCES = $(GRPCDIR)/proto/api/service/metadata/v1/metadata.grpc.pb.cc $(GRPCDIR)/proto/api/service/metadata/v1/metadata.pb.cc
+SOURCES = $(GRPCDIR)/proto/api/robot/v1/robot.grpc.pb.cc $(GRPCDIR)/proto/api/robot/v1/robot.pb.cc
 SOURCES += $(GRPCDIR)/proto/api/common/v1/common.grpc.pb.cc $(GRPCDIR)/proto/api/common/v1/common.pb.cc
 SOURCES += $(GRPCDIR)/proto/api/component/camera/v1/camera.grpc.pb.cc $(GRPCDIR)/proto/api/component/camera/v1/camera.pb.cc
 SOURCES += $(GRPCDIR)/google/api/annotations.pb.cc $(GRPCDIR)/google/api/httpbody.pb.cc
