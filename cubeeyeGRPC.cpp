@@ -8,8 +8,8 @@
 #include "proto/api/common/v1/common.pb.h"
 #include "proto/api/component/camera/v1/camera.grpc.pb.h"
 #include "proto/api/component/camera/v1/camera.pb.h"
-#include "proto/api/service/metadata/v1/metadata.grpc.pb.h"
-#include "proto/api/service/metadata/v1/metadata.pb.h"
+#include "proto/api/robot/v1/robot.grpc.pb.h"
+#include "proto/api/robot/v1/robot.pb.h"
 
 // clang-format off
 #include <CubeEye/CubeEyeSink.h>
@@ -50,18 +50,18 @@ using proto::api::component::camera::v1::GetFrameRequest;
 using proto::api::component::camera::v1::GetFrameResponse;
 using proto::api::component::camera::v1::GetPointCloudRequest;
 using proto::api::component::camera::v1::GetPointCloudResponse;
-using proto::api::service::metadata::v1::MetadataService;
-using proto::api::service::metadata::v1::ResourcesRequest;
-using proto::api::service::metadata::v1::ResourcesResponse;
+using proto::api::robot::v1::ResourceNamesRequest;
+using proto::api::robot::v1::ResourceNamesResponse;
+using proto::api::robot::v1::RobotService;
 
 std::atomic<bool> TOFdone{false};
 bool TOFerror = false;
 
-class MetadataServiceImpl final : public MetadataService::Service {
+class RobotServiceImpl final : public RobotService::Service {
    public:
-    grpc::Status Resources(ServerContext* context,
-                           const ResourcesRequest* request,
-                           ResourcesResponse* response) override {
+    grpc::Status ResourceNames(ServerContext* context,
+                               const ResourceNamesRequest* request,
+                               ResourceNamesResponse* response) override {
         ResourceName* name = response->add_resources();
         name->set_namespace_("rdk");
         name->set_type("component");
@@ -354,12 +354,12 @@ int main(int argc, char* argv[]) {
     //     return 1;
     // }
 
-    MetadataServiceImpl metadataService;
+    RobotServiceImpl robotService;
     CameraServiceImpl cameraService;
     ServerBuilder builder;
     builder.AddListeningPort("localhost:8085",
                              grpc::InsecureServerCredentials());
-    builder.RegisterService(&metadataService);
+    builder.RegisterService(&robotService);
     builder.RegisterService(&cameraService);
     // setup listener thread
     // MyListener listener;
