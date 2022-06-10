@@ -2,13 +2,13 @@
 version: 1
 script:
  - rm -rf AppDir | true
- - mkdir -p $APPDIR/usr/bin
- - cp ../../intelrealserver $APPDIR/usr/bin/
- - mkdir -p $APPDIR/usr/share/icons/viam/256x256/apps/
- - cp ./viam-server.png $APPDIR/usr/share/icons/viam/256x256/apps/viam-server.png
+ - mkdir -p $TARGET_APPDIR/usr/bin
+ - cp ../../intelrealserver $TARGET_APPDIR/usr/bin/
+ - mkdir -p $TARGET_APPDIR/usr/share/icons/viam/256x256/apps/
+ - cp ./viam-server.png $TARGET_APPDIR/usr/share/icons/viam/256x256/apps/viam-server.png
  - go install github.com/Otterverse/aix@latest
- - cp `go env GOPATH`/bin/aix $APPDIR/usr/bin/
- - chmod 755 $APPDIR/usr/bin/*
+ - cp `go env GOPATH`/bin/aix $TARGET_APPDIR/usr/bin/
+ - chmod 755 $TARGET_APPDIR/usr/bin/*
 
 AppDir:
   path: ./AppDir

@@ -1,4 +1,3 @@
-debian/work/
 appimages/AppDir/
-appimages/appimage-builder-cache/
+appimages/appimage-build/
 appimages/deploy/
