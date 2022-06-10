@@ -247,11 +247,11 @@ int main(int argc, char* argv[]) {
     meere::sensor::sptr_source_list _source_list =
         meere::sensor::search_camera_source();
 
-    if (nullptr == _source_list) {
-        std::cerr << "no cubeeye device!" << std::endl;
-        return -1;
-    } else {
+    if (nullptr != _source_list && 0 < _source_list->size())
         selected_source = 0;
+    else {
+        std::cerr << "cannot find CubeEye! Try a hard restart. " << std::endl;
+        return -1;
     }
 
     if (0 > selected_source) {
