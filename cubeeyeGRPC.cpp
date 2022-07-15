@@ -50,6 +50,9 @@ using proto::api::component::camera::v1::GetFrameRequest;
 using proto::api::component::camera::v1::GetFrameResponse;
 using proto::api::component::camera::v1::GetPointCloudRequest;
 using proto::api::component::camera::v1::GetPointCloudResponse;
+using proto::api::component::camera::v1::GetPropertiesRequest;
+using proto::api::component::camera::v1::GetPropertiesResponse;
+using proto::api::component::camera::v1::IntrinsicParameters;
 using proto::api::robot::v1::ResourceNamesRequest;
 using proto::api::robot::v1::ResourceNamesResponse;
 using proto::api::robot::v1::RobotService;
@@ -182,8 +185,7 @@ class CameraServiceImpl final : public CameraService::Service,
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
             }
 
-            auto _frames = std::move(mFrameListQueue.front());
-            mFrameListQueue.pop();
+            auto _frames = std::move(mFrameListQueue.back());
 
             float max = 0;
             float min = 100000;
@@ -283,6 +285,19 @@ class CameraServiceImpl final : public CameraService::Service,
 
         return grpc::Status::OK;
     }
+    ::grpc::Status GetProperties(ServerContext* context,
+                            const GetPropertiesRequest* request,
+                            GetPropertiesResponse* response) override {
+            IntrinsicParameters* intrinsics = response->mutable_intrinsic_parameters();
+            
+            intrinsics->set_width_px(640);
+            intrinsics->set_height_px(480);
+            intrinsics->set_focal_x_px(parameters.forcal.fx);
+            intrinsics->set_focal_y_px(parameters.forcal.fy);
+            intrinsics->set_center_x_px(parameters.principal.cx);
+            intrinsics->set_center_y_px(parameters.principal.cy);
+            return grpc::Status::OK;
+        }
 
     virtual std::string name() const { return std::string("CubeEyeServer"); }
     virtual void onCubeEyeCameraState(const meere::sensor::ptr_source source,
@@ -325,6 +340,8 @@ class CameraServiceImpl final : public CameraService::Service,
         }
     }
 
+     meere::sensor::IntrinsicParameters parameters;
+     // meere::sensor::DistortionCoefficients coefficients;
    public:
     virtual void onCubeEyeCameraPrepared(
         const meere::sensor::ptr_camera camera) {
@@ -335,7 +352,6 @@ class CameraServiceImpl final : public CameraService::Service,
    public:
     CameraServiceImpl() = default;
     virtual ~CameraServiceImpl() = default;
-
    protected:
     bool mReadFrameThreadStart;
     // std::thread mReadFrameThread;
@@ -389,7 +405,11 @@ int main(int argc, char* argv[]) {
             meere::sensor::destroy_camera(_camera);
             return -1;
         }
+        // get lens parameters
+        _rt = _camera->intrinsicParameters(cameraService.parameters, 0);
+        // _rt = _camera->distortionCoefficients(cameraService.coefficients, 0)
 
+        
         // set wanted frame type : depth
         int wantedFrame = meere::sensor::CubeEyeFrame::FrameType_Depth |
                           meere::sensor::CubeEyeFrame::FrameType_PointCloud;
