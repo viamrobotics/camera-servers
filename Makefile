@@ -28,6 +28,9 @@ cubeeyeserver: cubeeyeserver.cpp $(LIB_FILES)
 intelrealserver: intelrealserver.cpp $(LIB_FILES)
 	g++ -g -std=c++17 intelrealserver.cpp $(LIB_FILES) `pkg-config --cflags --libs realsense2 libhttpserver` $(special) -o intelrealserver
 
+slamrealserver: intelrealserverSaveStuff.cpp $(LIB_FILES)
+	g++ -g -std=c++17 intelrealserverSaveStuff.cpp $(LIB_FILES) `pkg-config --cflags --libs realsense2 opencv libhttpserver` $(special) -o slamrealserver
+
 royaleserver: royaleserver.cpp $(LIB_FILES)
 	g++ -g -std=c++17 royaleserver.cpp $(LIB_FILES) `pkg-config --cflags --libs libhttpserver royale` $(special) -o royaleserver
 
