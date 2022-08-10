@@ -23,10 +23,39 @@ void cameraThread(bool saveFlag, std::string path) {
         auto serial = dev.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER);
         std::cout << "got serial: " << serial << std::endl;
 
+        std::vector<rs2::sensor> sensors = dev.query_sensors();
+        int index = 0;
+    
+        // We can now iterate the sensors and print their names
+        for (rs2::sensor sensor : sensors)
+        
+            if (sensor.supports(RS2_CAMERA_INFO_NAME)) {
+                ++index;
+                
+                std::cout << "  " << index << " : " << sensor.get_info(RS2_CAMERA_INFO_NAME) << std::endl;
+                // get_sensor_option(sensor);
+                if (index == 1) {
+                //     sensor.set_option(RS2_OPTION_ENABLE_AUTO_EXPOSURE, 1);
+                //     sensor.set_option(RS2_OPTION_AUTO_EXPOSURE_LIMIT,50000);
+                //     sensor.set_option(RS2_OPTION_EMITTER_ENABLED, 1); // emitter on for depth information
+                    // sensor.set_option(RS2_OPTION_DEPTH_UNITS, 0.001);
+                }
+                if (index == 2){
+                    // RGB camera
+                    sensor.set_option(RS2_OPTION_EXPOSURE,80.f);
+                    
+                }
+
+                if (index == 3){
+                    sensor.set_option(RS2_OPTION_ENABLE_MOTION_CORRECTION,0);
+                }
+
+            }
+
         rs2::config cfg;
         cfg.enable_device(serial);
-        cfg.enable_stream(RS2_STREAM_DEPTH,1024, 768, RS2_FORMAT_Z16);;
-        cfg.enable_stream(RS2_STREAM_COLOR,1280, 720, RS2_FORMAT_RGB8);;
+        cfg.enable_stream(RS2_STREAM_DEPTH,640, 480, RS2_FORMAT_Z16);
+        cfg.enable_stream(RS2_STREAM_COLOR,1280, 720, RS2_FORMAT_RGB8);
 
         rs2::pipeline pipe(ctx);
         pipe.start(cfg);
@@ -85,15 +114,28 @@ void cameraThread(bool saveFlag, std::string path) {
                 cv::Mat im, imDepth;
             im = cv::Mat(cv::Size(width_img,height_img ), CV_8UC3, (void*)(vf.get_data()), cv::Mat::AUTO_STEP);
             imDepth = cv::Mat(cv::Size(width_img, height_img), CV_16U, (void*)(depth.get_data()), cv::Mat::AUTO_STEP);
-            std::time_t t = std::time(nullptr);
             char timestampVIAM[100];
-                std::strftime(timestampVIAM, sizeof(timestampVIAM), "%FT%H_%M_%S", std::gmtime(&t));
+            //     std::strftime(timestampVIAM, sizeof(timestampVIAM), "%FT%H_%M_%S", std::gmtime(&t));
             
-            double millisecondTime  = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-            double sec_since_epoch = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-            int currMillis = millisecondTime - sec_since_epoch*1000;
+            // double millisecondTime  = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+            // double sec_since_epoch = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+            // int currMillis = millisecondTime - sec_since_epoch*1000;
+            struct tm* tm_info;
+            struct timeval tv;
+              gettimeofday(&tv, NULL);
+
+                int millisec = lrint(tv.tv_usec/1000.0); // Round to nearest millisec
+                if (millisec>=1000) { // Allow for rounding up to nearest second
+                    millisec -=1000;
+                    tv.tv_sec++;
+                }
+
+                tm_info = localtime(&tv.tv_sec);
+
+                strftime(timestampVIAM, sizeof(timestampVIAM), "%FT%H_%M_%S", tm_info);
+                printf("%s.%03d\n", timestampVIAM, millisec);
             // std::replace(timeString.begin(), timeString.end(), ':', '_');
-		std::string millisString = std::to_string(currMillis);
+		std::string millisString = std::to_string(millisec);
             std::string filenameRGB = path + "/data/rgb/color_data_" + std::string(timestampVIAM) +"." + millisString  + ".png";
             std::string filenameDEPTH = path + "/data/depth/color_data_" + std::string(timestampVIAM) + "." +  millisString + ".png"; 
             cv::imwrite(filenameRGB,im);
