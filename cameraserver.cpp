@@ -23,6 +23,13 @@ void CameraOutput::add_depth(int bytesPerPixel, float units, int width,
     depth = buffer.str();
 }
 
+void CameraOutput::add_depth_raw(int bytesPerPixel, float units, int width,
+                             int height, const char* data) {
+    std::stringbuf buffer;
+    buffer.sputn(data, width * height * bytesPerPixel);
+    depth_raw = buffer.str();
+}
+
 CameraState* myCameraState = 0;
 
 CameraState* CameraState::get() {
@@ -81,6 +88,27 @@ class picture_resource_png : public camera_resource {
         auto out = stbi_write_png_to_mem((const unsigned char*)raw_data,
                                          mine->width * 3, mine->width,
                                          mine->height, 3, &pngLen);
+        std::string s((char*)out, pngLen);
+        STBIW_FREE(out);
+
+        return std::shared_ptr<http_response>(
+            new string_response(s, 200, "image/png"));
+    }
+};
+
+class depth_resource_png : public camera_resource {
+   public:
+    depth_resource_png(CameraState* cam) : camera_resource(cam) {}
+
+    const std::shared_ptr<http_response> myRender(CameraOutput* mine) {
+        const char* raw_data = mine->depth_raw.c_str();
+        int len = mine->depth_width * mine->depth_height * 2;
+        raw_data = raw_data + (mine->depth_raw.size() - len);
+
+        int pngLen;
+        auto out = stbi_write_png_to_mem((const unsigned char*)raw_data,
+                                         mine->depth_width * 2, mine->depth_width,
+                                         mine->depth_height, 2, &pngLen);
         std::string s((char*)out, pngLen);
         STBIW_FREE(out);
 
@@ -153,6 +181,7 @@ void installWebHandlers(httpserver::webserver* ws) {
     ws->register_resource("/pic.ppm", new picture_resource(x));
     ws->register_resource("/pic.png", new picture_resource_png(x));
     ws->register_resource("/pic.jpg", new picture_resource_jpg(x));
+    ws->register_resource("/depth.png", new depth_resource_png(x));
     ws->register_resource("/depth.dat", new depth_resource(x));
     ws->register_resource("/both", new combined_resource(x));
 }

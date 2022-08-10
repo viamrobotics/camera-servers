@@ -66,10 +66,15 @@ void cameraThread() {
                 my_write_ppm((const char*)vf.get_data(), vf.get_width(),
                              vf.get_height(), vf.get_bytes_per_pixel());
 
-            // create depth map
+            // create depth maps
 
             auto depth = frames.get_depth_frame();
+            output->depth_width = depth.get_width();
+            output->depth_height = depth.get_height();
             output->add_depth(depth.get_bytes_per_pixel(), depth.get_units(),
+                              depth.get_width(), depth.get_height(),
+                              (const char*)depth.get_data());
+            output->add_depth_raw(depth.get_bytes_per_pixel(), depth.get_units(),
                               depth.get_width(), depth.get_height(),
                               (const char*)depth.get_data());
 
