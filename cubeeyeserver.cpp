@@ -127,10 +127,13 @@ class MyListener : public meere::sensor::sink,
                             // frame data
                             output->width = _sptr_basic_frame->frameWidth();
                             output->height = _sptr_basic_frame->frameHeight();
+                            output->depth_width = _sptr_basic_frame->frameWidth();
+                            output->depth_height = _sptr_basic_frame->frameHeight();
 
                             // depth data
                             {
                                 std::stringbuf buffer;
+                                std::stringbuf raw_buffer;
                                 std::ostream os(&buffer);
                                 os << "VERSIONX\n";
                                 os << "2\n";
@@ -155,9 +158,11 @@ class MyListener : public meere::sensor::sink,
                                         if (max < s) max = s;
                                         if (min > s) min = s;
                                         buffer.sputn((const char*)&s, 2);
+                                        raw_buffer.sputn((const char*)&s, 2);
                                     }
                                 }
                                 output->depth = buffer.str();
+                                output->depth_raw = raw_buffer.str();
                             }
                         }
 
