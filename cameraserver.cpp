@@ -95,14 +95,13 @@ class depth_resource_png : public camera_resource {
     depth_resource_png(CameraState* cam) : camera_resource(cam) {}
 
     const std::shared_ptr<http_response> myRender(CameraOutput* mine) {
-        std::vector<uchar> buffer;
-        int len = mine->depth_width * mine->depth_height * 4; // 4 for 16-bit V and 16-bit A
-        buffer.resize(len)
-        cv::imencode(".png", mine->depth_cv, buffer)
-        std::cout << "buffer length: " << buffer.size() << "\n";
+        std::vector<uchar> chbuf;
+        chbuf.resize(512 * 1024);
+        cv::imencode(".png", mine->depth_cv, chbuf);
+	std::string s(chbuf.begin(), chbuf.end());
 
         return std::shared_ptr<http_response>(
-            new string_response((std::string)buffer, 200, "image/png"));
+            new string_response(s, 200, "image/png"));
     }
 };
 

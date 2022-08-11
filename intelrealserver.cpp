@@ -74,9 +74,10 @@ void cameraThread() {
             output->add_depth(depth.get_bytes_per_pixel(), depth.get_units(),
                               depth.get_width(), depth.get_height(),
                               (const char*)depth.get_data());
-            output->add_depth_raw(depth.get_bytes_per_pixel(), depth.get_units(),
-                              depth.get_width(), depth.get_height(),
-                              (const char*)depth.get_data());
+	    output->depth_cv = cv::Mat(cv::Size(output->depth_width, output->depth_height),
+		    CV_16U, 
+		    (void*)(depth.get_data()), 
+		    cv::Mat::AUTO_STEP);
 
             DEBUG("middle distance: " << depth.get_distance(
                       depth.get_width() / 2, depth.get_height() / 2));

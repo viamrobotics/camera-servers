@@ -133,7 +133,6 @@ class MyListener : public meere::sensor::sink,
                             // depth data
                             {
                                 std::stringbuf buffer;
-                                std::stringbuf raw_buffer;
                                 std::ostream os(&buffer);
                                 os << "VERSIONX\n";
                                 os << "2\n";
@@ -158,7 +157,6 @@ class MyListener : public meere::sensor::sink,
                                         if (max < s) max = s;
                                         if (min > s) min = s;
                                         buffer.sputn((const char*)&s, 2);
-                                        raw_buffer.sputn((const char*)&s, 2);
                                     }
                                 }
                                 output->depth = buffer.str();

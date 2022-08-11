@@ -64,6 +64,10 @@ class MyListener : public IDepthDataListener {
                 }
             }
             output->depth = buffer.str();
+	    output->depth_cv = cv::Mat(cv::Size(output->depth_width, output->depth_height),
+		    CV_16U, 
+		    (void*)(data->points), 
+		    cv::Mat::AUTO_STEP);
         }
 
         {
