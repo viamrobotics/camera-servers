@@ -98,7 +98,7 @@ class depth_resource_png : public camera_resource {
         std::vector<uchar> chbuf;
         chbuf.resize(512 * 1024); // just needs to be big enough. prob should be smarter.
         cv::imencode(".png", mine->depth_cv, chbuf);
-	std::string s(chbuf.begin(), chbuf.end());
+	    std::string s(chbuf.begin(), chbuf.end());
 
         return std::shared_ptr<http_response>(
             new string_response(s, 200, "image/png"));

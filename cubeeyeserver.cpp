@@ -134,7 +134,7 @@ class MyListener : public meere::sensor::sink,
                             {
                                 std::stringbuf buffer;
                                 std::ostream os(&buffer);
-				cv::Mat cvBuf(output->depth_height, output->depth_width, CV_16U);
+				                cv::Mat cvBuf(output->depth_height, output->depth_width, CV_16U);
                                 os << "VERSIONX\n";
                                 os << "2\n";
                                 os << ".001\n";
@@ -158,7 +158,7 @@ class MyListener : public meere::sensor::sink,
                                         if (max < s) max = s;
                                         if (min > s) min = s;
                                         buffer.sputn((const char*)&s, 2);
-					cvBuf.at<short>(y, x) = s;
+					                    cvBuf.at<short>(y, x) = s;
                                     }
                                 }
                                 output->depth = buffer.str();
