@@ -4,6 +4,7 @@
 
 #include <iostream>
 #include <sstream>
+#include <opencv2/imgcodecs.hpp>
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
@@ -21,13 +22,6 @@ void CameraOutput::add_depth(int bytesPerPixel, float units, int width,
 
     buffer.sputn(data, width * height * bytesPerPixel);
     depth = buffer.str();
-}
-
-void CameraOutput::add_depth_raw(int bytesPerPixel, float units, int width,
-                             int height, const char* data) {
-    std::stringbuf buffer;
-    buffer.sputn(data, width * height * bytesPerPixel);
-    depth_raw = buffer.str();
 }
 
 CameraState* myCameraState = 0;
@@ -101,19 +95,14 @@ class depth_resource_png : public camera_resource {
     depth_resource_png(CameraState* cam) : camera_resource(cam) {}
 
     const std::shared_ptr<http_response> myRender(CameraOutput* mine) {
-        const char* raw_data = mine->depth_raw.c_str();
-        int len = mine->depth_width * mine->depth_height * 2;
-        raw_data = raw_data + (mine->depth_raw.size() - len);
-
-        int pngLen;
-        auto out = stbi_write_png_to_mem((const unsigned char*)raw_data,
-                                         mine->depth_width * 2, mine->depth_width,
-                                         mine->depth_height, 2, &pngLen);
-        std::string s((char*)out, pngLen);
-        STBIW_FREE(out);
+        std::vector<uchar> buffer;
+        int len = mine->depth_width * mine->depth_height * 4; // 4 for 16-bit V and 16-bit A
+        buffer.resize(len)
+        cv::imencode(".png", mine->depth_cv, buffer)
+        std::cout << "buffer length: " << buffer.size() << "\n";
 
         return std::shared_ptr<http_response>(
-            new string_response(s, 200, "image/png"));
+            new string_response((std::string)buffer, 200, "image/png"));
     }
 };
 

@@ -162,7 +162,10 @@ class MyListener : public meere::sensor::sink,
                                     }
                                 }
                                 output->depth = buffer.str();
-                                output->depth_raw = raw_buffer.str();
+                                output->depth_cv = cv::Mat(cv::Size(output->depth_width, output->depth_height),
+                                    CV_16U, 
+                                    (void*)(_sptr_frame_data), 
+                                    cv::Mat::AUTO_STEP);
                             }
                         }
 
