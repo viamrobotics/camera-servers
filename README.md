@@ -12,7 +12,7 @@
   * Needed only for CubeEye cameras
 * [libopencv](https://opencv.org/releases/)
   * In most apt repos `sudo apt install libopencv-dev`
-  * Needed only for OpenCV server
+  * Needed for all servers in order to create depth png endpoint.
 * [gRPC] (https://github.com/viamrobotics/rdk/tree/main/grpc/cpp)
   * Needed for gRPC servers
 * [openssl]
