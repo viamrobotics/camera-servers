@@ -75,6 +75,16 @@ void cameraThread() {
                               depth.get_width(), depth.get_height(),
                               (const char*)depth.get_data());
 
+	    int w = output->depth_width;
+	    int h = output->depth_height;
+	    cv::Mat cvBuf(h, w, CV_16U);
+	    const uint16_t *z_pixels = reinterpret_cast<const uint16_t*>(depth.get_data());
+	    for (int y = 0; y < h; y++) {
+	      for (int x = 0; x < w; x++) { 
+		cvBuf.at<uint16_t>(y,x) = z_pixels[y*w+x];
+	      }
+	    }
+	    output->depth_cv = cvBuf;
             DEBUG("middle distance: " << depth.get_distance(
                       depth.get_width() / 2, depth.get_height() / 2));
 
