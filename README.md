@@ -18,7 +18,11 @@
 * [openssl]
   * Needed for gRPC servers
 ## Installation Instructions
-Run `make` after dependencies are installed. Generate a debian package for the default cameras with `make deb`
+The simplest way to create the binaries are to compile using the Docker canon image for the desired architecture.
+[Internal docs for docker canon.](https://viam.atlassian.net/wiki/spaces/ENG/pages/23527432/Canon+Docker+Images+and+Tools)
+
+You can then export an AppImage of the binary using
+`cd packaging/appimages && appimage-builder --recipe mycameraserver-`uname -m`.yml`
 
 ### macOS dependency install
 Run `make setupmacos`
