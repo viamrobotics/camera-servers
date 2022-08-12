@@ -22,6 +22,7 @@ void CameraOutput::add_depth(int bytesPerPixel, float units, int width,
 
     buffer.sputn(data, width * height * bytesPerPixel);
     depth = buffer.str();
+    depth_cv = cv::Mat(cv::Size(width, height), CV_16U, (void*)(data), cv::Mat::AUTO_STEP);
 }
 
 CameraState* myCameraState = 0;
