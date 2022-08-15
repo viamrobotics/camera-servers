@@ -22,7 +22,9 @@ The simplest way to create the binaries are to compile using the Docker canon im
 [Internal docs for docker canon.](https://viam.atlassian.net/wiki/spaces/ENG/pages/23527432/Canon+Docker+Images+and+Tools)
 
 You can then export an AppImage of the binary using
-`cd packaging/appimages && appimage-builder --recipe mycameraserver-`uname -m`.yml`
+```
+cd packaging/appimages && appimage-builder --recipe mycameraserver-`uname -m`.yml
+```
 
 ### macOS dependency install
 Run `make setupmacos`
