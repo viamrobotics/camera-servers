@@ -31,6 +31,7 @@ AppDir:
     include:
     - libhttpserver1:arm64
     - libroyale3:arm64
+    - libopencv-imgcodecs4.5:arm64
   files:
     include: []
     exclude:

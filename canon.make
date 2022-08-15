@@ -1,4 +1,4 @@
-DOCKER_CMD = docker run -v$(HOME)/.ssh:/home/testbot/.ssh:ro -v$(shell pwd):/host --workdir /host --rm -ti $(DOCKER_PLATFORM) ghcr.io/viamrobotics/canon:$(DOCKER_TAG) --testbot-uid $(shell id -u) --testbot-gid $(shell id -g)
+DOCKER_CMD = docker run $(DOCKER_SSH_AGENT) $(DOCKER_NETRC_RUN) -v$(HOME)/.ssh:/home/testbot/.ssh:ro -v$(shell pwd):/host --workdir /host --rm -ti $(DOCKER_PLATFORM) ghcr.io/viamrobotics/canon:$(DOCKER_TAG) --testbot-uid $(shell id -u) --testbot-gid $(shell id -g)
 
 ifeq ("aarch64", "$(shell uname -m)")
 	DOCKER_NATIVE_PLATFORM = --platform linux/arm64
@@ -15,6 +15,19 @@ else ifeq ("x86_64", "$(shell uname -m)")
 else
 	DOCKER_NATIVE_TAG = latest
 	DOCKER_NATIVE_TAG_CACHE = latest
+endif
+
+# If there's a netrc file, use it.
+ifeq ($(shell grep -qs github.com ~/.netrc && `which echo` -n yes), yes)
+	DOCKER_NETRC_BUILD = --secret id=netrc,src=$(HOME)/.netrc
+	DOCKER_NETRC_RUN = -v$(HOME)/.netrc:/home/testbot/.netrc:ro
+endif
+
+ifeq ("Darwin", "$(shell uname -s)")
+	# Docker has magic paths for OSX
+	DOCKER_SSH_AGENT = -v /run/host-services/ssh-auth.sock:/run/host-services/ssh-auth.sock -e SSH_AUTH_SOCK="/run/host-services/ssh-auth.sock"
+else ifneq ("$(SSH_AUTH_SOCK)x", "x")
+	DOCKER_SSH_AGENT = -v "$(SSH_AUTH_SOCK):$(SSH_AUTH_SOCK)" -e SSH_AUTH_SOCK="$(SSH_AUTH_SOCK)"
 endif
 
 DOCKER_PLATFORM = $(DOCKER_NATIVE_PLATFORM)
