@@ -34,6 +34,8 @@ class MyListener : public IDepthDataListener {
         std::shared_ptr<CameraOutput> output(new CameraOutput());
         output->width = data->width;
         output->height = data->height;
+        output->depth_width = data->width;
+        output->depth_height = data->height;
 
         float min = 100000;
         float max = 0;
@@ -41,6 +43,7 @@ class MyListener : public IDepthDataListener {
         {
             std::stringbuf buffer;
             std::ostream os(&buffer);
+	        cv::Mat cvBuf(output->depth_height, output->depth_width, CV_16U);
 
             os << "VERSIONX\n";
             os << "2\n";
@@ -61,9 +64,11 @@ class MyListener : public IDepthDataListener {
                     short s = short(1000 * val.z);
 
                     buffer.sputn((const char*)&s, 2);
+		            cvBuf.at<short>(y, x) = s;
                 }
             }
             output->depth = buffer.str();
+            output->depth_cv = cvBuf;
         }
 
         {

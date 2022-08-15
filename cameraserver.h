@@ -5,6 +5,8 @@
 #include <httpserver.hpp>
 #include <string>
 #include <vector>
+#include <opencv2/core/core.hpp>
+#include <opencv2/core/mat.hpp>
 
 class CameraOutput {
    public:
@@ -12,11 +14,13 @@ class CameraOutput {
 
     void add_depth(int bytesPerPixel, float units, int width, int height,
                    const char* data);
-
     int width;
     int height;
+    int depth_width;
+    int depth_height;
     std::string ppmdata;
     std::string depth;
+    cv::Mat depth_cv;
 };
 
 class CameraState {

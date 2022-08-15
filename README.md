@@ -12,13 +12,17 @@
   * Needed only for CubeEye cameras
 * [libopencv](https://opencv.org/releases/)
   * In most apt repos `sudo apt install libopencv-dev`
-  * Needed only for OpenCV server
+  * Needed for all servers in order to create depth png endpoint.
 * [gRPC] (https://github.com/viamrobotics/rdk/tree/main/grpc/cpp)
   * Needed for gRPC servers
 * [openssl]
   * Needed for gRPC servers
 ## Installation Instructions
-Run `make` after dependencies are installed. Generate a debian package for the default cameras with `make deb`
+The simplest way to create the binaries are to compile using the Docker canon image for the desired architecture.
+[Internal docs for docker canon.](https://viam.atlassian.net/wiki/spaces/ENG/pages/23527432/Canon+Docker+Images+and+Tools)
+
+You can then export an AppImage of the binary using
+`cd packaging/appimages && appimage-builder --recipe mycameraserver-`uname -m`.yml`
 
 ### macOS dependency install
 Run `make setupmacos`

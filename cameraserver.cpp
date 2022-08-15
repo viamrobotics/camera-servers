@@ -4,6 +4,7 @@
 
 #include <iostream>
 #include <sstream>
+#include <opencv2/imgcodecs.hpp>
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
@@ -89,6 +90,21 @@ class picture_resource_png : public camera_resource {
     }
 };
 
+class depth_resource_png : public camera_resource {
+   public:
+    depth_resource_png(CameraState* cam) : camera_resource(cam) {}
+
+    const std::shared_ptr<http_response> myRender(CameraOutput* mine) {
+        std::vector<uchar> chbuf;
+        chbuf.resize(512 * 1024); // just needs to be big enough. prob should be smarter.
+        cv::imencode(".png", mine->depth_cv, chbuf);
+	    std::string s(chbuf.begin(), chbuf.end());
+
+        return std::shared_ptr<http_response>(
+            new string_response(s, 200, "image/png"));
+    }
+};
+
 const int maxJpegSize = 512 * 1024;
 struct jpeg_out {
     char buf[maxJpegSize];
@@ -153,6 +169,7 @@ void installWebHandlers(httpserver::webserver* ws) {
     ws->register_resource("/pic.ppm", new picture_resource(x));
     ws->register_resource("/pic.png", new picture_resource_png(x));
     ws->register_resource("/pic.jpg", new picture_resource_jpg(x));
+    ws->register_resource("/depth.png", new depth_resource_png(x));
     ws->register_resource("/depth.dat", new depth_resource(x));
     ws->register_resource("/both", new combined_resource(x));
 }
