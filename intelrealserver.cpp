@@ -65,7 +65,16 @@ void cameraThread() {
             output->ppmdata =
                 my_write_ppm((const char*)vf.get_data(), vf.get_width(),
                              vf.get_height(), vf.get_bytes_per_pixel());
-            output->pic_cv = cv::Mat(vf.get_height(), vf.get_width(), CV_8UC3, (void*)(vf.get_data()));
+            try {
+                output->pic_cv = cv::Mat(vf.get_height(), vf.get_width(),
+                                         CV_8UC3, (void*)(vf.get_data()));
+            } catch (std::exception& e) {
+                // Catch exceptions, since constructing the matrix can fail
+                // when the size is 0.
+                std::cout
+                    << "Exception while constructing matrix for color frame: "
+                    << e.what() << std::endl;
+            }
 
             // create depth maps
 
