@@ -74,6 +74,7 @@ void cameraThread() {
                 std::cout
                     << "Exception while constructing matrix for color frame: "
                     << e.what() << std::endl;
+                output->pic_cv = cv::Mat();
             }
 
             // create depth maps
