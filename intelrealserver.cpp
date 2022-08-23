@@ -65,6 +65,7 @@ void cameraThread() {
             output->ppmdata =
                 my_write_ppm((const char*)vf.get_data(), vf.get_width(),
                              vf.get_height(), vf.get_bytes_per_pixel());
+            output->pic_cv = cv::Mat(vf.get_height(), vf.get_width(), CV_8UC3, (void*)(vf.get_data()));
 
             // create depth maps
 

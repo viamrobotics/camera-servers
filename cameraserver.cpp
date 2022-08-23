@@ -74,16 +74,26 @@ class picture_resource_png : public camera_resource {
     picture_resource_png(CameraState* cam) : camera_resource(cam) {}
 
     const std::shared_ptr<http_response> myRender(CameraOutput* mine) {
-        const char* raw_data = mine->ppmdata.c_str();
-        int len = mine->width * mine->height * 3;
-        raw_data = raw_data + (mine->ppmdata.size() - len);
+        std::string s;
 
-        int pngLen;
-        auto out = stbi_write_png_to_mem((const unsigned char*)raw_data,
-                                         mine->width * 3, mine->width,
-                                         mine->height, 3, &pngLen);
-        std::string s((char*)out, pngLen);
-        STBIW_FREE(out);
+        if (!mine->pic_cv.empty()) {
+            // Use imencode if possible, since it's faster.
+            std::vector<uchar> chbuf;
+            chbuf.resize(512 * 1024);
+            cv::imencode(".png", mine->pic_cv, chbuf);
+            s = std::string(chbuf.begin(), chbuf.end());
+        } else {
+            const char* raw_data = mine->ppmdata.c_str();
+            int len = mine->width * mine->height * 3;
+            raw_data = raw_data + (mine->ppmdata.size() - len);
+
+            int pngLen;
+            auto out = stbi_write_png_to_mem((const unsigned char*)raw_data,
+                                             mine->width * 3, mine->width,
+                                             mine->height, 3, &pngLen);
+            s = std::string((char*)out, pngLen);
+            STBIW_FREE(out);
+        }
 
         return std::shared_ptr<http_response>(
             new string_response(s, 200, "image/png"));

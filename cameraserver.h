@@ -20,6 +20,7 @@ class CameraOutput {
     int depth_height;
     std::string ppmdata;
     std::string depth;
+    cv::Mat pic_cv;
     cv::Mat depth_cv;
 };
 
