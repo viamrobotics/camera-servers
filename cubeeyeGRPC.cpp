@@ -79,15 +79,6 @@ class RobotServiceImpl final : public RobotService::Service {
         name2->set_type("component");
         name2->set_subtype("camera");
         name2->set_name("Depth");
-
-        // leaving the both camera commented out for when we add this type to
-        // rdk @JOHN
-
-        // ResourceName* name3 = response->add_resources();
-        //  name3->set_namespace_("rdk");
-        //  name3->set_type("component");
-        //  name3->set_subtype("camera");
-        //  name3->set_name("Both");
         return grpc::Status::OK;
     }
 };
@@ -275,6 +266,7 @@ class CameraServiceImpl final : public CameraService::Service,
     ::grpc::Status GetProperties(ServerContext* context,
                             const GetPropertiesRequest* request,
                             GetPropertiesResponse* response) override {
+	    response->set_supports_pcd(true);
             IntrinsicParameters* intrinsics = response->mutable_intrinsic_parameters();
             
             intrinsics->set_width_px(640);
@@ -360,8 +352,7 @@ int main(int argc, char* argv[]) {
     RobotServiceImpl robotService;
     CameraServiceImpl cameraService;
     ServerBuilder builder;
-    builder.AddListeningPort("localhost:8085",
-                             grpc::InsecureServerCredentials());
+    builder.AddListeningPort("0.0.0.0:8085", grpc::InsecureServerCredentials());
     builder.RegisterService(&robotService);
     builder.RegisterService(&cameraService);
     // setup listener thread
@@ -426,8 +417,7 @@ int main(int argc, char* argv[]) {
         signal(SIGQUIT, signal_callback_handler);
 
         std::unique_ptr<Server> server(builder.BuildAndStart());
-        std::cout << "Server listening on "
-                  << "localhost:8085" << std::endl;
+        std::cout << "GRPC Server listening on 0.0.0.0:8085" << std::endl;
         while (!TOFdone) {  // keep going until we stop
             std::this_thread::sleep_for(std::chrono::milliseconds(200));
             // if an error in the camera occurs(sometimes timeout error on
