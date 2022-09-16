@@ -1,5 +1,6 @@
 #include <grpc/grpc.h>
 #include <grpcpp/security/server_credentials.h>
+// #include <grpcpp/ext/proto_server_reflection_plugin.h>
 #include <grpcpp/server.h>
 #include <grpcpp/server_builder.h>
 #include <grpcpp/server_context.h>
@@ -10,6 +11,9 @@
 #include "proto/api/component/camera/v1/camera.pb.h"
 #include "proto/api/robot/v1/robot.grpc.pb.h"
 #include "proto/api/robot/v1/robot.pb.h"
+
+#include <opencv2/core/mat.hpp>
+#include <opencv2/imgcodecs.hpp>
 
 // clang-format off
 #include <CubeEye/CubeEyeSink.h>
@@ -46,8 +50,8 @@ using grpc::ServerReaderWriter;
 using grpc::ServerWriter;
 using proto::api::common::v1::ResourceName;
 using proto::api::component::camera::v1::CameraService;
-using proto::api::component::camera::v1::GetFrameRequest;
-using proto::api::component::camera::v1::GetFrameResponse;
+using proto::api::component::camera::v1::GetImageRequest;
+using proto::api::component::camera::v1::GetImageResponse;
 using proto::api::component::camera::v1::GetPointCloudRequest;
 using proto::api::component::camera::v1::GetPointCloudResponse;
 using proto::api::component::camera::v1::GetPropertiesRequest;
@@ -76,15 +80,6 @@ class RobotServiceImpl final : public RobotService::Service {
         name2->set_type("component");
         name2->set_subtype("camera");
         name2->set_name("Depth");
-
-        // leaving the both camera commented out for when we add this type to
-        // rdk @JOHN
-
-        // ResourceName* name3 = response->add_resources();
-        //  name3->set_namespace_("rdk");
-        //  name3->set_type("component");
-        //  name3->set_subtype("camera");
-        //  name3->set_name("Both");
         return grpc::Status::OK;
     }
 };
@@ -93,9 +88,9 @@ class CameraServiceImpl final : public CameraService::Service,
                                 public meere::sensor::sink,
                                 public meere::sensor::prepared_listener {
    public:
-    ::grpc::Status GetFrame(ServerContext* context,
-                            const GetFrameRequest* request,
-                            GetFrameResponse* response) override {
+    ::grpc::Status GetImage(ServerContext* context, 
+		            const GetImageRequest* request, 
+			    GetImageResponse* response) override {
         if (mReadFrameThreadStart) {
             if (mFrameListQueue.empty()) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -110,67 +105,51 @@ class CameraServiceImpl final : public CameraService::Service,
             auto reqName = request->name();
             char alpha = 255;
             for (auto itframe : (*_frames)) {
-                if (itframe->frameType() ==
-                    meere::sensor::CubeEyeFrame::FrameType_Depth) {
-                    std::stringbuf buffer;
-                    std::ostream os(&buffer);
-                    auto _sptr_basic_frame =
-                        meere::sensor::frame_cast_basic16u(itframe);
-                    auto _sptr_frame_data =
-                        _sptr_basic_frame->frameData();  // depth data array
+                if (itframe->frameType() == meere::sensor::CubeEyeFrame::FrameType_Depth) {
+                    std::vector<uchar> chbuf;
+                    chbuf.resize(512 * 1024);
+                    auto _sptr_basic_frame = meere::sensor::frame_cast_basic16u(itframe);
+                    auto _sptr_frame_data = _sptr_basic_frame->frameData();  // depth data array
                     int dim_x = _sptr_basic_frame->frameWidth();
                     int dim_y = _sptr_basic_frame->frameHeight();
                     response->set_width_px(dim_x);
                     response->set_height_px(dim_y);
-                    // if (reqName == "Both")
-                    //     response->set_mime_type("image/both");
-                    if (reqName == "Depth")
-                        response->set_mime_type("image/raw-depth");
-                    if (reqName == "Gray")
-                        response->set_mime_type("image/raw-rgba");
-                    if ((reqName == "Both") || (reqName == "Depth")) {
-                        os << "VERSIONX\n";
-                        os << "2\n";
-                        os << ".001\n";
-                        os << dim_x << "\n";
-                        os << dim_y << "\n";
-                    }
-                    for (int y = 0; y < dim_y; y++) {
-                        for (int x = 0; x < dim_x; x++) {
-                            _frame_index = y * dim_x + x;
-                            short s = (*_sptr_frame_data)[_frame_index];
-
-                            if (max < s) max = s;
-                            if (min > s) min = s;
-                            if ((reqName == "Both") || (reqName == "Depth")) {
-                                buffer.sputn((const char*)&s, 2);
+                    if (reqName == "Depth") {
+                        response->set_mime_type("image/png");
+				        cv::Mat cvBuf(dim_y, dim_x, CV_16U);
+                        for (int y = 0; y < dim_y; y++) {
+                            for (int x = 0; x < dim_x; x++) {
+                                _frame_index = y * dim_x + x;
+                                short s = (*_sptr_frame_data)[_frame_index];
+                                if (max < s) max = s;
+                                if (min > s) min = s;
+                                cvBuf.at<short>(y, x) = s;
                             }
                         }
+                        cv::imencode(".png", cvBuf, chbuf);
                     }
-                    if ((reqName == "Both") || (reqName == "Gray")) {
+                    if (reqName == "Gray") {
+                        response->set_mime_type("image/jpeg");
+				        cv::Mat cvBuf(dim_y, dim_x, CV_8UC3);
                         float span = max - min;
-                        // if (reqName == "Both")
-                        //     os << "P6\n" << dim_x << " " << dim_y <<
-                        //     "\n255\n";
                         for (int y = 0; y < dim_y; y++) {
                             for (int x = 0; x < dim_x; x++) {
                                 _frame_index = y * dim_x + x;
                                 short val = (*_sptr_frame_data)[_frame_index];
-                                char clr = 0;
+                                int clr = 0;
                                 if (val > 0) {
                                     auto ratio = (val - min) / span;
-                                    clr = (char)(60 + (int)(ratio * 192));
+                                    clr = (60 + (int)(ratio * 192));
                                     if (clr > 250) clr = 250;
                                     if (clr < 0) clr = 0;
                                 }
-                                os << (char)clr;
-                                os << (char)clr;
-                                os << (char)clr;
-                                if (reqName == "Gray") os << (char)alpha;
+                                cvBuf.at<cv::Vec3b>(y, x) = cv::Vec3b(clr, clr, clr);
                             }
                         }
+                        cv::imencode(".jpeg", cvBuf, chbuf);
                     }
-                    response->set_image(buffer.str());
+                    std::string s(chbuf.begin(), chbuf.end());
+                    response->set_image(s);
                 }
             }
         }
@@ -288,6 +267,7 @@ class CameraServiceImpl final : public CameraService::Service,
     ::grpc::Status GetProperties(ServerContext* context,
                             const GetPropertiesRequest* request,
                             GetPropertiesResponse* response) override {
+	    response->set_supports_pcd(true);
             IntrinsicParameters* intrinsics = response->mutable_intrinsic_parameters();
             
             intrinsics->set_width_px(640);
@@ -372,9 +352,10 @@ int main(int argc, char* argv[]) {
 
     RobotServiceImpl robotService;
     CameraServiceImpl cameraService;
+    grpc::EnableDefaultHealthCheckService(true);
+    // grpc::reflection::InitProtoReflectionServerBuilderPlugin();
     ServerBuilder builder;
-    builder.AddListeningPort("localhost:8085",
-                             grpc::InsecureServerCredentials());
+    builder.AddListeningPort("0.0.0.0:8085", grpc::InsecureServerCredentials());
     builder.RegisterService(&robotService);
     builder.RegisterService(&cameraService);
     // setup listener thread
@@ -439,8 +420,7 @@ int main(int argc, char* argv[]) {
         signal(SIGQUIT, signal_callback_handler);
 
         std::unique_ptr<Server> server(builder.BuildAndStart());
-        std::cout << "Server listening on "
-                  << "localhost:8085" << std::endl;
+        std::cout << "GRPC Server listening on 0.0.0.0:8085" << std::endl;
         while (!TOFdone) {  // keep going until we stop
             std::this_thread::sleep_for(std::chrono::milliseconds(200));
             // if an error in the camera occurs(sometimes timeout error on
