@@ -1,5 +1,6 @@
 #include <grpc/grpc.h>
 #include <grpcpp/security/server_credentials.h>
+// #include <grpcpp/ext/proto_server_reflection_plugin.h>
 #include <grpcpp/server.h>
 #include <grpcpp/server_builder.h>
 #include <grpcpp/server_context.h>
@@ -87,9 +88,9 @@ class CameraServiceImpl final : public CameraService::Service,
                                 public meere::sensor::sink,
                                 public meere::sensor::prepared_listener {
    public:
-    ::grpc::Status GetImage(ServerContext* context,
-                            const GetImageRequest* request,
-                            GetImageResponse* response) override {
+    ::grpc::Status GetImage(ServerContext* context, 
+		            const GetImageRequest* request, 
+			    GetImageResponse* response) override {
         if (mReadFrameThreadStart) {
             if (mFrameListQueue.empty()) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -351,6 +352,8 @@ int main(int argc, char* argv[]) {
 
     RobotServiceImpl robotService;
     CameraServiceImpl cameraService;
+    grpc::EnableDefaultHealthCheckService(true);
+    // grpc::reflection::InitProtoReflectionServerBuilderPlugin();
     ServerBuilder builder;
     builder.AddListeningPort("0.0.0.0:8085", grpc::InsecureServerCredentials());
     builder.RegisterService(&robotService);
