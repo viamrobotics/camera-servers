@@ -57,4 +57,3 @@ sudo make install
 https://github.com/IntelRealSense/librealsense/blob/master/doc/libuvc_installation.md
 
 Lastly, to use a local copy of RDK see https://github.com/viamrobotics/rdk/blob/main/grpc/cpp/README.md for setting up required grpc components and after doing the `make setup buf` in grpc/cpp inside RDK, set `RDK_SOURCE_DIR` appropriately and build.
-* `RDK_SOURCE_DIR=~/source/rdk make cubeeyegrpc`
