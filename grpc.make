@@ -35,5 +35,3 @@ bufsetup:
 	ln -sf `which grpc_cpp_plugin` grpc/bin/protoc-gen-grpc-cpp
 	pkg-config openssl || export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:`find \`which brew > /dev/null && brew --prefix\` -name openssl.pc | head -n1 | xargs dirname`
 
-cubeeyegrpcserver: cubeeyeGRPC.cpp $(LIB_FILES) $(SOURCES)
-	g++ -g -std=c++17 cubeeyeGRPC.cpp $(LIB_FILES) `pkg-config --cflags --libs libhttpserver opencv4 cubeeye` $(SOURCES) -I$(GRPCDIR) $(GRPCFLAGS) -o cubeeyegrpcserver
