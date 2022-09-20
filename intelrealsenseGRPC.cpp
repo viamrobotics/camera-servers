@@ -43,18 +43,32 @@ using grpc::ServerContext;
 using grpc::ServerReader;
 using grpc::ServerReaderWriter;
 using grpc::ServerWriter;
-using proto::api::common::v1::ResourceName;
-using proto::api::component::camera::v1::CameraService;
-using proto::api::component::camera::v1::GetImageRequest;
-using proto::api::component::camera::v1::GetImageResponse;
-using proto::api::component::camera::v1::GetPointCloudRequest;
-using proto::api::component::camera::v1::GetPointCloudResponse;
-using proto::api::component::camera::v1::GetPropertiesRequest;
-using proto::api::component::camera::v1::GetPropertiesResponse;
-using proto::api::component::camera::v1::IntrinsicParameters;
-using proto::api::robot::v1::ResourceNamesRequest;
-using proto::api::robot::v1::ResourceNamesResponse;
-using proto::api::robot::v1::RobotService;
+using viam::common::v1::ResourceName;
+using viam::component::camera::v1::CameraService;
+using viam::component::camera::v1::GetImageRequest;
+using viam::component::camera::v1::GetImageResponse;
+using viam::component::camera::v1::GetPointCloudRequest;
+using viam::component::camera::v1::GetPointCloudResponse;
+using viam::component::camera::v1::GetPropertiesRequest;
+using viam::component::camera::v1::GetPropertiesResponse;
+using viam::component::camera::v1::IntrinsicParameters;
+using viam::robot::v1::ResourceNamesRequest;
+using viam::robot::v1::ResourceNamesResponse;
+using viam::robot::v1::RobotService;
+
+class CameraOutput {
+   public:
+    CameraOutput() {}
+
+    int color_width;
+    int color_height;
+    int color_pixel_bytes;
+    cv::Mat colorframe;
+    int depth_width;
+    int depth_height;
+    int depth_pixel_bytes;
+    cv::Mat depthframe;
+};
 
 class CameraState {
    private:
@@ -76,20 +90,6 @@ CameraState* CameraState::get() {
     }
     return myCameraState;
 }
-
-class CameraOutput {
-   public:
-    CameraOutput() {}
-
-    int color_width;
-    int color_height;
-    int color_pixel_bytes;
-    cv::Mat colorframe;
-    int depth_width;
-    int depth_height;
-    int depth_pixel_bytes;
-    cv::Mat depthframe;
-};
 
 class CameraServiceImpl final : public CameraService::Service {
    private:
@@ -115,7 +115,7 @@ class CameraServiceImpl final : public CameraService::Service {
            if (reqName == "color") {
                if (reqMimeType == "image/png") {
                    response->set_mime_type("image/png");
-                   std::vector<uchar> cfbuf;
+                   std::vector<uchar> chbuf;
                    chbuf.resize(5*1024*1024);
                    cv::imencode(".png", data->colorframe, chbuf);
                    std::string s(chbuf.begin(), chbuf.end()); 
@@ -128,7 +128,7 @@ class CameraServiceImpl final : public CameraService::Service {
                    response->set_image(s);
                } else { // return jpeg by default
                    response->set_mime_type("image/jpeg");
-                   std::vector<uchar> cfbuf;
+                   std::vector<uchar> chbuf;
                    chbuf.resize(5*1024*1024);
                    cv::imencode(".jpg", data->colorframe, chbuf);
                    std::string s(chbuf.begin(), chbuf.end()); 
@@ -138,7 +138,7 @@ class CameraServiceImpl final : public CameraService::Service {
            if (reqName == "depth") {
                if (reqMimeType == "image/jpeg") {
                    response->set_mime_type("image/jpeg");
-                   std::vector<uchar> cfbuf;
+                   std::vector<uchar> chbuf;
                    chbuf.resize(5*1024*1024);
                    cv::imencode(".png", data->colorframe, chbuf);
                    std::string s(chbuf.begin(), chbuf.end()); 
@@ -150,7 +150,7 @@ class CameraServiceImpl final : public CameraService::Service {
                    response->set_image(s);
                } else { // return png by default
                    response->set_mime_type("image/png");
-                   std::vector<uchar> cfbuf;
+                   std::vector<uchar> chbuf;
                    chbuf.resize(5*1024*1024);
                    cv::imencode(".png", data->depthframe, chbuf);
                    std::string s(chbuf.begin(), chbuf.end()); 
@@ -219,14 +219,12 @@ void cameraThread() {
             frames = alignment.process(frames);
             rs2::video_frame color = frames.get_color_frame();
             rs2::depth_frame depth = frames.get_depth_frame();
-            points = pc.calculate(depth);
-            pc.map_to(color);
             // color info 
             output->color_width = color.get_width();
             output->color_height = color.get_height();
-            output->color_pixel_bytes = color.bytes_per_pixel();
+            output->color_pixel_bytes = color.get_bytes_per_pixel();
             try {
-                output->colorframe = cv::Mat(vf.get_height(), vf.get_width(), CV_8UC3, (void*)(color.get_data()));
+                output->colorframe = cv::Mat(color.get_height(), color.get_width(), CV_8UC3, (void*)(color.get_data()));
             } catch (std::exception& e) {
                 // Catch exceptions, since constructing the matrix can fail when the size is 0.
                 std::cout << "Exception while constructing matrix for color frame: " << e.what() << std::endl;
@@ -235,8 +233,8 @@ void cameraThread() {
             // depth info
             output->depth_width = depth.get_width();
             output->depth_height = depth.get_height();
-            output->depth_pixel_bytes = depth.bytes_per_pixel();
-            std::cout << "depth bytes per pixel: " << depth.bytes_per_pixel() << std::endl;
+            output->depth_pixel_bytes = depth.get_bytes_per_pixel();
+            std::cout << "depth bytes per pixel: " << depth.get_bytes_per_pixel() << std::endl;
             try {
                 output->depthframe = cv::Mat(depth.get_height(), depth.get_width(), CV_16U, (void*)(depth.get_data()));
             } catch (std::exception& e) {

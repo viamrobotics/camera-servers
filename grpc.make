@@ -20,13 +20,13 @@ SOURCES += $(GRPCDIR)/google/api/http.pb.cc
 
 
 # An alternative to the buf target below, using github access instead of buf.build
-pull-rdk: bufsetup pull-rdk.sh
-	./pull-rdk.sh
+pull-api: bufsetup pull-api.sh
+	./pull-api.sh
 	cd api && PATH="${PATH}:`pwd`/../grpc/bin" buf generate --template ../grpc/buf.gen.yaml
 	cd api && PATH="${PATH}:`pwd`/../grpc/bin" buf generate --template ../grpc/buf.google.gen.yaml buf.build/googleapis/googleapis
 
 buf: bufsetup
-	PATH="${PATH}:`pwd`/grpc/bin" buf generate --template ./grpc/buf.gen.yaml buf.build/viamrobotics/rdk
+	PATH="${PATH}:`pwd`/grpc/bin" buf generate --template ./grpc/buf.gen.yaml buf.build/viamrobotics/api
 	PATH="${PATH}:`pwd`/grpc/bin" buf generate --template ./grpc/buf.google.gen.yaml buf.build/googleapis/googleapis
 
 bufsetup:
@@ -35,5 +35,5 @@ bufsetup:
 	ln -sf `which grpc_cpp_plugin` grpc/bin/protoc-gen-grpc-cpp
 	pkg-config openssl || export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:`find \`which brew > /dev/null && brew --prefix\` -name openssl.pc | head -n1 | xargs dirname`
 
-intelrealgrpcserver: intelrealsenseGRPC.cpp $(LIB_FILES) $(SOURCES)
-	g++ -g -std=c++17 intelrealsenseGRPC.cpp $(LIB_FILES) `pkg-config --cflags --libs realsense2 libhttpserver opencv4` $(SOURCES) -I$(GRPCDIR) $(GRPCFLAGS) -o intelrealgrpcserver
+intelrealgrpcserver: intelrealsenseGRPC.cpp $(SOURCES)
+	g++ -g -std=c++17 intelrealsenseGRPC.cpp `pkg-config --cflags --libs realsense2 libhttpserver opencv4` $(SOURCES) -I$(GRPCDIR) $(GRPCFLAGS) -o intelrealgrpcserver
