@@ -6,15 +6,15 @@ else
 ifneq ($(wildcard ./grpc/cpp/gen),)
 GRPCDIR=./grpc/cpp/gen
 else
-GRPCDIR=./rdk-minimal/grpc/cpp/gen
+GRPCDIR=./api/grpc/cpp/gen
 endif
 endif
 
 GRPCFLAGS = `pkg-config --cflags grpc --libs protobuf grpc++` -pthread -Wl,-lgrpc++_reflection -Wl,-ldl
 
-SOURCES = $(GRPCDIR)/proto/api/robot/v1/robot.grpc.pb.cc $(GRPCDIR)/proto/api/robot/v1/robot.pb.cc
-SOURCES += $(GRPCDIR)/proto/api/common/v1/common.grpc.pb.cc $(GRPCDIR)/proto/api/common/v1/common.pb.cc
-SOURCES += $(GRPCDIR)/proto/api/component/camera/v1/camera.grpc.pb.cc $(GRPCDIR)/proto/api/component/camera/v1/camera.pb.cc
+SOURCES = $(GRPCDIR)/robot/v1/robot.grpc.pb.cc $(GRPCDIR)/robot/v1/robot.pb.cc
+SOURCES += $(GRPCDIR)/common/v1/common.grpc.pb.cc $(GRPCDIR)/common/v1/common.pb.cc
+SOURCES += $(GRPCDIR)/component/camera/v1/camera.grpc.pb.cc $(GRPCDIR)/component/camera/v1/camera.pb.cc
 SOURCES += $(GRPCDIR)/google/api/annotations.pb.cc $(GRPCDIR)/google/api/httpbody.pb.cc
 SOURCES += $(GRPCDIR)/google/api/http.pb.cc
 
@@ -22,8 +22,8 @@ SOURCES += $(GRPCDIR)/google/api/http.pb.cc
 # An alternative to the buf target below, using github access instead of buf.build
 pull-rdk: bufsetup pull-rdk.sh
 	./pull-rdk.sh
-	cd rdk-minimal && PATH="${PATH}:`pwd`/../grpc/bin" buf generate --template ../grpc/buf.gen.yaml
-	cd rdk-minimal && PATH="${PATH}:`pwd`/../grpc/bin" buf generate --template ../grpc/buf.google.gen.yaml buf.build/googleapis/googleapis
+	cd api && PATH="${PATH}:`pwd`/../grpc/bin" buf generate --template ../grpc/buf.gen.yaml
+	cd api && PATH="${PATH}:`pwd`/../grpc/bin" buf generate --template ../grpc/buf.google.gen.yaml buf.build/googleapis/googleapis
 
 buf: bufsetup
 	PATH="${PATH}:`pwd`/grpc/bin" buf generate --template ./grpc/buf.gen.yaml buf.build/viamrobotics/rdk

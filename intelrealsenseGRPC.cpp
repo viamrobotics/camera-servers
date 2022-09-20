@@ -5,12 +5,12 @@
 #include <grpcpp/server_builder.h>
 #include <grpcpp/server_context.h>
 
-#include "proto/api/common/v1/common.grpc.pb.h"
-#include "proto/api/common/v1/common.pb.h"
-#include "proto/api/component/camera/v1/camera.grpc.pb.h"
-#include "proto/api/component/camera/v1/camera.pb.h"
-#include "proto/api/robot/v1/robot.grpc.pb.h"
-#include "proto/api/robot/v1/robot.pb.h"
+#include "common/v1/common.grpc.pb.h"
+#include "common/v1/common.pb.h"
+#include "component/camera/v1/camera.grpc.pb.h"
+#include "component/camera/v1/camera.pb.h"
+#include "robot/v1/robot.grpc.pb.h"
+#include "robot/v1/robot.pb.h"
 
 #include <opencv2/core/mat.hpp>
 #include <opencv2/imgcodecs.hpp>
