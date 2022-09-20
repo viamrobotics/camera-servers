@@ -234,7 +234,6 @@ void cameraThread() {
             output->depth_width = depth.get_width();
             output->depth_height = depth.get_height();
             output->depth_pixel_bytes = depth.get_bytes_per_pixel();
-            std::cout << "depth bytes per pixel: " << depth.get_bytes_per_pixel() << std::endl;
             try {
                 output->depthframe = cv::Mat(depth.get_height(), depth.get_width(), CV_16U, (void*)(depth.get_data()));
             } catch (std::exception& e) {
