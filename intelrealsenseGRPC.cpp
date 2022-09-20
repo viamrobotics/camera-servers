@@ -92,24 +92,23 @@ CameraState* CameraState::get() {
 }
 
 class CameraServiceImpl final : public CameraService::Service {
-   private:
-       CameraState* cams_;
    public:
-       explicit CameraServiceImpl(CameraState* cam) : cams_(cam) {}
+       CameraServiceImpl() = default;
        virtual ~CameraServiceImpl() = default;
 
 	   ::grpc::Status GetImage(ServerContext* context, 
                const GetImageRequest* request, 
                GetImageResponse* response) override {
            // check if camera is found 
-           if (cams_->cameras.size() < 1) {
+           if (CameraState::get()->cameras.size() < 1) {
                return grpc::Status(grpc::StatusCode::NOT_FOUND, "camera not found");
            }
            // check if camera is ready
-           if (!cams_->ready) {
+           if (!CameraState::get()->ready) {
                return grpc::Status(grpc::StatusCode::UNAVAILABLE, "camera is not ready");
            }
-           CameraOutput* data = cams_->cameras[0].get();
+           std::shared_ptr<CameraOutput> mine = CameraState::get()->cameras[0];
+           CameraOutput* data = mine.get();
            auto reqName = request->name();
            auto reqMimeType = request->mime_type();
            if (reqName == "color") {
@@ -278,7 +277,7 @@ class RobotServiceImpl final : public RobotService::Service {
 int main(int argc, char* argv[]) {
     std::thread t(cameraThread); // start running the camera
     RobotServiceImpl robotService;
-    CameraServiceImpl cameraService(myCameraState);
+    CameraServiceImpl cameraService;
     grpc::EnableDefaultHealthCheckService(true);
     // grpc::reflection::InitProtoReflectionServerBuilderPlugin();
     ServerBuilder builder;
