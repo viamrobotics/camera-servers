@@ -143,8 +143,9 @@ class CameraServiceImpl final : public CameraService::Service {
                    std::string s(chbuf.begin(), chbuf.end()); 
                    response->set_image(s);
                } else if (reqMimeType == "image/vnd.viam.rgba") {
+                   response->set_mime_type("image/vnd.viam.rgba");
                    cv::Mat cvConverted(data->depth_height, data->depth_width, CV_16UC4);
-                   cv::cvtColor(data->colorframe, cvConverted, cv::COLOR_GRAY2RGBA, 4);
+                   cv::cvtColor(data->depthframe, cvConverted, cv::COLOR_GRAY2RGBA, 4);
                     std::string s(cvConverted.datastart, cvConverted.dataend);
                    response->set_image(s);
                } else { // return png by default
