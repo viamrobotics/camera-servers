@@ -242,7 +242,7 @@ class CameraServiceImpl final : public CameraService::Service {
     virtual std::string name() const { return std::string("IntelRealSenseServer"); }
 };
 
-void cameraThread(RealSenseProperties* rsp, RealSenseOutput* rso) {
+void cameraThread(RealSenseProperties* rsp, RealSenseOutput* rso, int width, int height) {
     rs2::context ctx;
     rs2::device_list devices = ctx.query_devices();
     rs2::device selected_device;
@@ -260,8 +260,13 @@ void cameraThread(RealSenseProperties* rsp, RealSenseOutput* rso) {
 
 	rs2::config cfg;
 	cfg.enable_device(serial);
+	try {
+        cfg.enable_stream(RS2_STREAM_COLOR, width, height, RS2_FORMAT_RGB8); // 0 width or height indicates any
+	} catch (std::exception& e) {
+		std::cout << "Exception while enabling (" << width << ", " << height <<") stream: " << e.what() << std::endl;
+        exit(-1);
+    }
 	cfg.enable_stream(RS2_STREAM_DEPTH);
-	cfg.enable_stream(RS2_STREAM_COLOR);
 
 	rs2::pipeline p(ctx);
 	p.start(cfg);
@@ -292,9 +297,7 @@ void cameraThread(RealSenseProperties* rsp, RealSenseOutput* rso) {
     while (true) {
         auto start = std::chrono::high_resolution_clock::now();
 
-        int num = 0;
 		rs2::frameset frames = p.wait_for_frames();
-
 		// this handles the geometry so that the
 		// x/y of the depth and color are the same
 		frames = alignment.process(frames);
@@ -324,13 +327,13 @@ void cameraThread(RealSenseProperties* rsp, RealSenseOutput* rso) {
 		} catch (std::exception& e) {
 			std::cout << "Exception while constructing pointcloud: " << e.what() << std::endl;
 		}
-        auto finish = std::chrono::high_resolution_clock::now();
-        DEBUG(std::chrono::duration_cast<std::chrono::milliseconds>(finish-start).count() << "ms");
         rso->mu.lock();
         rso->colorframe = output->colorframe;
         rso->depthframe = output->depthframe;
         rso->colorcloud = output->colorcloud;
         rso->mu.unlock();
+        auto finish = std::chrono::high_resolution_clock::now();
+        DEBUG(std::chrono::duration_cast<std::chrono::milliseconds>(finish-start).count() << "ms");
         cameraReady = true;
     }
 }
@@ -356,21 +359,34 @@ class RobotServiceImpl final : public RobotService::Service {
 };
 
 int main(int argc, char* argv[]) {
-    std::cout << "Booting up intel realsense grpc server..." << std::endl;
+    if (argc == 1) {
+        std::cout << "1 or 3 arguments needed. port_number image_width image_height. width and height are optional." << std::endl;
+        exit(-1);
+    }
+    std::string port = argv[1];
+    std::string x_resolution = "";
+    std::string y_resolution = "";
+    if (argc > 2) {
+        x_resolution =  argv[2];
+    }
+    if (argc > 3) {
+        y_resolution =  argv[3];
+    }
     auto rsp = make_unique<RealSenseProperties>();
     auto rso = make_unique<RealSenseOutput>();
     // start running camera thread
-    std::thread t(cameraThread, rsp.get(), rso.get()); 
+    std::thread t(cameraThread, rsp.get(), rso.get(), std::atoi(x_resolution.c_str()), std::atoi(y_resolution.c_str())); 
     RobotServiceImpl robotService;
     CameraServiceImpl cameraService(rsp.get(), rso.get());
     grpc::EnableDefaultHealthCheckService(true);
     // grpc::reflection::InitProtoReflectionServerBuilderPlugin();
     ServerBuilder builder;
-    builder.AddListeningPort("0.0.0.0:8085", grpc::InsecureServerCredentials());
+    std::string address = "0.0.0.0:" + port;
+    builder.AddListeningPort(address, grpc::InsecureServerCredentials());
     builder.RegisterService(&robotService);
     builder.RegisterService(&cameraService);
     std::unique_ptr<Server> server(builder.BuildAndStart());
-    std::cout << "Starting to listen on 0.0.0.0:8085" << std::endl;
+    std::cout << "Starting to listen on " << address << std::endl;
     server->Wait();
     return 0;
 }

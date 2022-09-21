@@ -19,12 +19,6 @@ SOURCES += $(GRPCDIR)/google/api/annotations.pb.cc $(GRPCDIR)/google/api/httpbod
 SOURCES += $(GRPCDIR)/google/api/http.pb.cc
 
 
-# An alternative to the buf target below, using github access instead of buf.build
-pull-api: bufsetup pull-api.sh
-	./pull-api.sh
-	cd api && PATH="${PATH}:`pwd`/../grpc/bin" buf generate --template ../grpc/buf.gen.yaml
-	cd api && PATH="${PATH}:`pwd`/../grpc/bin" buf generate --template ../grpc/buf.google.gen.yaml buf.build/googleapis/googleapis
-
 buf: bufsetup
 	PATH="${PATH}:`pwd`/grpc/bin" buf generate --template ./grpc/buf.gen.yaml buf.build/viamrobotics/api
 	PATH="${PATH}:`pwd`/grpc/bin" buf generate --template ./grpc/buf.google.gen.yaml buf.build/googleapis/googleapis
