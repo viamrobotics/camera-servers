@@ -2,11 +2,12 @@
 
 #pragma once
 
+#include <atomic>
 #include <httpserver.hpp>
-#include <string>
-#include <vector>
 #include <opencv2/core/core.hpp>
 #include <opencv2/core/mat.hpp>
+#include <string>
+#include <vector>
 
 class CameraOutput {
    public:
@@ -25,15 +26,24 @@ class CameraOutput {
 };
 
 class CameraState {
-   private:
-    CameraState() : ready(0), lastRequest(0) {}
-
    public:
     static CameraState* get();
 
-    std::vector<std::shared_ptr<CameraOutput>> cameras;
-    bool ready;
-    volatile time_t lastRequest;
+    void setLastRequest(time_t lastRequest);
+    time_t getLastRequest();
+    void addCamera();
+    void setCameraOutput(size_t i, std::shared_ptr<CameraOutput> output);
+    std::shared_ptr<CameraOutput> getCameraOutput(size_t i);
+    size_t getNumCameras();
+
+    std::atomic<bool> ready;
+
+   private:
+    CameraState() : ready(0), _lastRequest(0) {}
+
+    std::mutex _mutex;
+    std::vector<std::shared_ptr<CameraOutput>> _cameras;
+    volatile time_t _lastRequest;
 };
 
 class camera_resource : public httpserver::http_resource {
@@ -50,7 +60,7 @@ class camera_resource : public httpserver::http_resource {
 
     const std::shared_ptr<httpserver::http_response> render(
         const httpserver::http_request& r) {
-        _cams->lastRequest = time(0);
+        _cams->setLastRequest(time(0));
 
         if (!_cams->ready) {
             return std::shared_ptr<httpserver::http_response>(
@@ -58,12 +68,12 @@ class camera_resource : public httpserver::http_resource {
         }
 
         int camNumera = getCameraNumber(r);
-        if (camNumera >= _cams->cameras.size()) {
+        if (camNumera >= _cams->getNumCameras()) {
             return std::shared_ptr<httpserver::http_response>(
                 new httpserver::string_response("invalid camera\n"));
         }
 
-        std::shared_ptr<CameraOutput> mine(_cams->cameras[camNumera]);
+        std::shared_ptr<CameraOutput> mine(_cams->getCameraOutput(camNumera));
         return myRender(mine.get());
     }
 

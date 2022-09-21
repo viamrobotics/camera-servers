@@ -43,7 +43,7 @@ class MyListener : public IDepthDataListener {
         {
             std::stringbuf buffer;
             std::ostream os(&buffer);
-	        cv::Mat cvBuf(output->depth_height, output->depth_width, CV_16U);
+            cv::Mat cvBuf(output->depth_height, output->depth_width, CV_16U);
 
             os << "VERSIONX\n";
             os << "2\n";
@@ -64,7 +64,7 @@ class MyListener : public IDepthDataListener {
                     short s = short(1000 * val.z);
 
                     buffer.sputn((const char*)&s, 2);
-		            cvBuf.at<short>(y, x) = s;
+                    cvBuf.at<short>(y, x) = s;
                 }
             }
             output->depth = buffer.str();
@@ -99,7 +99,7 @@ class MyListener : public IDepthDataListener {
             output->ppmdata = buffer.str();
         }
 
-        CameraState::get()->cameras[0] = output;
+        CameraState::get()->setCameraOutput(0, output);
 
         CameraState::get()->ready = 1;
     }
@@ -141,7 +141,7 @@ int main(int argc, char** argv) {
     }
 
     // signal we have one and only 1 camera
-    CameraState::get()->cameras.push_back(0);
+    CameraState::get()->addCamera();
 
     auto status = cameraDevice->initialize();
     if (status != CameraStatus::SUCCESS) {
