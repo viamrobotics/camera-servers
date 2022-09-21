@@ -108,6 +108,9 @@ class CameraServiceImpl final : public CameraService::Service {
            auto reqName = request->name();
            auto reqMimeType = request->mime_type();
            if (reqName == "color") {
+               if (m_rso->colorframe.empty()) {
+                  return grpc::Status(grpc::StatusCode::UNAVAILABLE, "no data in this image");
+               }
                if (reqMimeType == "image/png") {
                    response->set_mime_type("image/png");
                    std::vector<uchar> chbuf;
@@ -135,6 +138,9 @@ class CameraServiceImpl final : public CameraService::Service {
                }
            }
            if (reqName == "depth") {
+               if (m_rso->depthframe.empty()) {
+                  return grpc::Status(grpc::StatusCode::UNAVAILABLE, "no data in this image");
+               }
                if (reqMimeType == "image/jpeg") {
                    response->set_mime_type("image/jpeg");
                    std::vector<uchar> chbuf;
@@ -166,6 +172,9 @@ class CameraServiceImpl final : public CameraService::Service {
            // check if camera is ready
            if (!cameraReady) {
                return grpc::Status(grpc::StatusCode::UNAVAILABLE, "camera is not ready");
+           }
+           if (m_rso->colorcloud.points.size() == 0) {
+              return grpc::Status(grpc::StatusCode::UNAVAILABLE, "no data in this pointcloud");
            }
            auto cloud = m_rso->colorcloud;
            // create the pcd file
