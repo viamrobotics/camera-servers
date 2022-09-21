@@ -65,10 +65,18 @@ class CameraOutput {
 
     int color_width;
     int color_height;
+    float color_fx;
+    float color_fy;
+    float color_ppx;
+    float color_ppy;
     int color_pixel_bytes;
     cv::Mat colorframe;
     int depth_width;
     int depth_height;
+    float depth_fx;
+    float depth_fy;
+    float depth_ppx;
+    float depth_ppy;
     int depth_pixel_bytes;
     cv::Mat depthframe;
     pcl::PointCloud<pcl::PointXYZRGB> colorcloud;
@@ -213,7 +221,37 @@ class CameraServiceImpl final : public CameraService::Service {
        ::grpc::Status GetProperties(ServerContext* context,
                const GetPropertiesRequest* request,
                GetPropertiesResponse* response) override {
-            return grpc::Status::OK;
+           // check if camera is found 
+           if (CameraState::get()->cameras.size() < 1) {
+               return grpc::Status(grpc::StatusCode::NOT_FOUND, "camera not found");
+           }
+           // check if camera is ready
+           if (!CameraState::get()->ready) {
+               return grpc::Status(grpc::StatusCode::UNAVAILABLE, "camera is not ready");
+           }
+           std::shared_ptr<CameraOutput> mine = CameraState::get()->cameras[0];
+           CameraOutput* data = mine.get();
+	       response->set_supports_pcd(true);
+           IntrinsicParameters* intrinsics = response->mutable_intrinsic_parameters();
+           auto reqName = request->name();
+           if (reqName == "color") {
+                intrinsics->set_width_px(data->color_width);
+                intrinsics->set_height_px(data->color_height);
+                intrinsics->set_focal_x_px(data->color_fx);
+                intrinsics->set_focal_y_px(data->color_fy);
+                intrinsics->set_center_x_px(data->color_ppx);
+                intrinsics->set_center_y_px(data->color_ppy);
+           }
+           if (reqName == "depth") {
+                intrinsics->set_width_px(data->depth_width);
+                intrinsics->set_height_px(data->depth_height);
+                intrinsics->set_focal_x_px(data->depth_fx);
+                intrinsics->set_focal_y_px(data->depth_fy);
+                intrinsics->set_center_x_px(data->depth_ppx);
+                intrinsics->set_center_y_px(data->depth_ppy);
+           }
+
+           return grpc::Status::OK;
         }
 
     virtual std::string name() const { return std::string("IntelRealSenseServer"); }
