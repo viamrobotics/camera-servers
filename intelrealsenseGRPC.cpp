@@ -379,6 +379,7 @@ class RobotServiceImpl final : public RobotService::Service {
 };
 
 int main(int argc, char* argv[]) {
+    std::cout << "Booting up intel realsense grpc server..." << std::endl;
     std::thread t(cameraThread); // start running the camera
     RobotServiceImpl robotService;
     CameraServiceImpl cameraService;
