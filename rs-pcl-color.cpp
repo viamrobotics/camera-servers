@@ -38,7 +38,6 @@ using namespace std;
 typedef pcl::PointXYZRGB RGB_Cloud;
 typedef pcl::PointCloud<RGB_Cloud> point_cloud;
 typedef point_cloud::Ptr cloud_pointer;
-typedef point_cloud::Ptr prevCloud;
 
 //======================================================
 // RGB Texture

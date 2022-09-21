@@ -18,6 +18,7 @@
 
 #include <librealsense2/rs.hpp>
 
+
 #include <assert.h>
 #include <signal.h>
 #include <string.h>
@@ -34,6 +35,8 @@
 #include <thread>
 #include <tuple>
 #include <vector>
+
+#include "rs-pcl-color.cpp"
 
 #define DEBUG(x)
 using namespace std;
@@ -68,6 +71,7 @@ class CameraOutput {
     int depth_height;
     int depth_pixel_bytes;
     cv::Mat depthframe;
+    pcl::PointCloud<pcl::PointXYZRGB> colorcloud;
 };
 
 class CameraState {
@@ -139,7 +143,7 @@ class CameraServiceImpl final : public CameraService::Service {
                    response->set_mime_type("image/jpeg");
                    std::vector<uchar> chbuf;
                    chbuf.resize(5*1024*1024);
-                   cv::imencode(".png", data->colorframe, chbuf);
+                   cv::imencode(".jpg", data->colorframe, chbuf);
                    std::string s(chbuf.begin(), chbuf.end()); 
                    response->set_image(s);
                } else if (reqMimeType == "image/vnd.viam.rgba") {
@@ -171,6 +175,38 @@ class CameraServiceImpl final : public CameraService::Service {
            if (!CameraState::get()->ready) {
                return grpc::Status(grpc::StatusCode::UNAVAILABLE, "camera is not ready");
            }
+           std::shared_ptr<CameraOutput> mine = CameraState::get()->cameras[0];
+           CameraOutput* data = mine.get();
+           auto cloud = data->colorcloud;
+           // create the pcd file
+           std::stringbuf buffer;
+           std::ostream oss(&buffer);
+           oss << "VERSION .7\n"
+               << "FIELDS x y z rgb\n"
+               << "SIZE 4 4 4 4\n"
+               << "TYPE F F F I\n"
+               << "COUNT 1 1 1 1\n"
+               << "WIDTH " << cloud.points.size() << "\n"
+               << "HEIGHT " << 1 << "\n"
+               << "VIEWPOINT 0 0 0 1 0 0 0\n"
+               << "POINTS " << cloud.points.size() << "\n"
+               << "DATA binary\n";
+           for (int i = 0; i < cloud.points.size(); i++) {
+               auto point = cloud.points[i];
+               float x = point.x;
+               float y = point.y;
+               float z = point.z;
+               int rgb = 0;
+               rgb = rgb | (point.r << 16);
+               rgb = rgb | (point.g << 8);
+               rgb = rgb | (point.b << 0);
+               buffer.sputn((const char*)&x, 4);
+               buffer.sputn((const char*)&y, 4);
+               buffer.sputn((const char*)&z, 4);
+               buffer.sputn((const char*)&rgb, 4);
+           }
+           response->set_mime_type("pointcloud/pcd");
+           response->set_point_cloud(buffer.str());
            return grpc::Status::OK;
        }
 
@@ -248,9 +284,16 @@ void cameraThread() {
             }
             // pointcloud info
             rs2::pointcloud pc;
-            rs2::points points;
-            points = pc.calculate(depth);
-            // save the points in the output
+            pc.map_to(color);
+            auto points = pc.calculate(depth);
+            try {
+                auto cloud = PCL_Conversion(points, color);
+                output->colorcloud = *cloud;
+            } catch (std::exception& e) {
+                std::cout << "Exception while constructing matrix pointcloud: " << e.what() << std::endl;
+                output->colorcloud = pcl::PointCloud<pcl::PointXYZRGB>();
+            }
+            // save the the output
             CameraState::get()->cameras[num++] = output;
         }
         auto finish = std::chrono::high_resolution_clock::now();
