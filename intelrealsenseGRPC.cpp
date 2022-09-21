@@ -300,8 +300,14 @@ void cameraThread() {
             rs2::video_frame color = frames.get_color_frame();
             rs2::depth_frame depth = frames.get_depth_frame();
             // color info 
+            auto const color_stream = p.get_active_profile().get_stream(RS2_STREAM_COLOR).as<rs2::video_stream_profile>();
+            auto color_intrin = color_stream.get_intrinsics();
             output->color_width = color.get_width();
             output->color_height = color.get_height();
+            output->color_fx = color_intrin.fx;
+            output->color_fy = color_intrin.fy;
+            output->color_ppx = color_intrin.ppx;
+            output->color_ppy = color_intrin.ppy;
             output->color_pixel_bytes = color.get_bytes_per_pixel();
             try {
                 output->colorframe = cv::Mat(color.get_height(), color.get_width(), CV_8UC3, (void*)(color.get_data()));
@@ -311,8 +317,14 @@ void cameraThread() {
                 output->colorframe = cv::Mat();
             }
             // depth info
+            auto const depth_stream = p.get_active_profile().get_stream(RS2_STREAM_DEPTH).as<rs2::video_stream_profile>();
+            auto depth_intrin = depth_stream.get_intrinsics();
             output->depth_width = depth.get_width();
             output->depth_height = depth.get_height();
+            output->depth_fx = depth_intrin.fx;
+            output->depth_fy = depth_intrin.fy;
+            output->depth_ppx = depth_intrin.ppx;
+            output->depth_ppy = depth_intrin.ppy;
             output->depth_pixel_bytes = depth.get_bytes_per_pixel();
             try {
                 output->depthframe = cv::Mat(depth.get_height(), depth.get_width(), CV_16U, (void*)(depth.get_data()));
