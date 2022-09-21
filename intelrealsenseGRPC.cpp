@@ -163,8 +163,14 @@ class CameraServiceImpl final : public CameraService::Service {
        ::grpc::Status GetPointCloud(ServerContext* context, 
                const GetPointCloudRequest* request, 
                GetPointCloudResponse* response) override {
-            //rs2::pointcloud pc = rs2::context().create_pointcloud();
-            //rs2::points points;
+           // check if camera is found 
+           if (CameraState::get()->cameras.size() < 1) {
+               return grpc::Status(grpc::StatusCode::NOT_FOUND, "camera not found");
+           }
+           // check if camera is ready
+           if (!CameraState::get()->ready) {
+               return grpc::Status(grpc::StatusCode::UNAVAILABLE, "camera is not ready");
+           }
            return grpc::Status::OK;
        }
 
@@ -240,6 +246,10 @@ void cameraThread() {
                 std::cout << "Exception while constructing matrix for depth frame: " << e.what() << std::endl;
                 output->depthframe = cv::Mat();
             }
+            // pointcloud info
+            rs2::pointcloud pc;
+            rs2::points points;
+            points = pc.calculate(depth);
             // save the points in the output
             CameraState::get()->cameras[num++] = output;
         }
