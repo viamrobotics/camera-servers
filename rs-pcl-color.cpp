@@ -17,8 +17,6 @@
 
 #include <iostream>
 #include <algorithm> 
-#include <boost/date_time/posix_time/posix_time.hpp>
-#include <boost/thread/thread.hpp>
 #include <string>
 
 // Intel Realsense Headers
@@ -29,8 +27,6 @@
 #include <pcl/point_types.h>
 #include <pcl/common/common_headers.h>
 #include <pcl/features/normal_3d.h>
-#include <pcl/console/parse.h>
-#include <boost/thread/thread.hpp>
 #include <pcl/io/io.h>
 
 using namespace std;
