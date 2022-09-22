@@ -360,12 +360,15 @@ class RobotServiceImpl final : public RobotService::Service {
 
 int main(int argc, char* argv[]) {
     if (argc == 1) {
-        std::cout << "1 or 3 arguments needed. port_number image_width image_height. width and height are optional." << std::endl;
+        std::cout << "optional arguments are: port_number, image_width, image_height." << std::endl;
         exit(-1);
     }
-    std::string port = argv[1];
+    std::string port = "8085";
     std::string x_resolution = "";
     std::string y_resolution = "";
+    if (argc > 1) {
+        port =  argv[1];
+    }
     if (argc > 2) {
         x_resolution =  argv[2];
     }
