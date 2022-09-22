@@ -361,7 +361,6 @@ class RobotServiceImpl final : public RobotService::Service {
 int main(int argc, char* argv[]) {
     if (argc == 1) {
         std::cout << "optional arguments are: port_number, image_width, image_height." << std::endl;
-        exit(-1);
     }
     std::string port = "8085";
     std::string x_resolution = "";
