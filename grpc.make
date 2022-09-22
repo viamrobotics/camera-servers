@@ -29,5 +29,5 @@ bufsetup:
 	ln -sf `which grpc_cpp_plugin` grpc/bin/protoc-gen-grpc-cpp
 	pkg-config openssl || export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:`find \`which brew > /dev/null && brew --prefix\` -name openssl.pc | head -n1 | xargs dirname`
 
-intelrealgrpcserver: intelrealsenseGRPC.cpp $(SOURCES)
-	g++ -g -std=c++17 intelrealsenseGRPC.cpp `pkg-config --cflags --libs pcl_io-1.11 pcl_common-1.11 realsense2 libhttpserver opencv4` -lboost_system $(SOURCES) -I$(GRPCDIR) $(GRPCFLAGS) -o intelrealgrpcserver
+intelrealgrpcserver: intelrealsenseGRPC.cpp $(LIB_FILES) $(SOURCES)
+	g++ -g -std=c++17 intelrealsenseGRPC.cpp $(LIB_FILES) `pkg-config --cflags --libs realsense2 libhttpserver opencv4` $(SOURCES) -I$(GRPCDIR) $(GRPCFLAGS) -o intelrealgrpcserver
