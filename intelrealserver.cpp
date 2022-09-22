@@ -46,7 +46,6 @@ void cameraThread() {
 
         int num = 0;
         for (auto& p : pipelines) {
-
             std::shared_ptr<CameraOutput> output(new CameraOutput());
 
             rs2::frameset frames;
@@ -78,7 +77,6 @@ void cameraThread() {
             output->ppmdata =
                 my_write_ppm((const char*)vf.get_data(), vf.get_width(),
                              vf.get_height(), vf.get_bytes_per_pixel());
-
             try {
                 output->pic_cv = cv::Mat(vf.get_height(), vf.get_width(),
                                          CV_8UC3, (void*)(vf.get_data()));
@@ -109,7 +107,6 @@ void cameraThread() {
 		cvBuf.at<uint16_t>(y,x) = z_pixels[y*w+x];
 	      }
 	    }
-
 	    output->depth_cv = cvBuf;
             DEBUG("middle distance: " << depth.get_distance(
                       depth.get_width() / 2, depth.get_height() / 2));
