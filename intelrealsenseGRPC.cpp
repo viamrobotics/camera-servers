@@ -1,6 +1,5 @@
 #include <grpc/grpc.h>
 #include <grpcpp/security/server_credentials.h>
-// #include <grpcpp/ext/proto_server_reflection_plugin.h>
 #include <grpcpp/server.h>
 #include <grpcpp/server_builder.h>
 #include <grpcpp/server_context.h>
@@ -90,13 +89,14 @@ class CameraServiceImpl final : public CameraService::Service {
                GetImageResponse* response) override {
            std::string reqName = request->name();
            std::string reqMimeType = request->mime_type();
+           if (!CameraState::get()->ready) {
+              return grpc::Status(grpc::StatusCode::UNAVAILABLE, "camera not ready");
+           }
            auto output = CameraState::get()->getCameraOutput(0);
+           std::cout << "requested mime type: " << reqMimeType << std::endl;
            if (reqName == "color") {
-               if (output->pic_cv.empty()) {
-                  return grpc::Status(grpc::StatusCode::UNAVAILABLE, "no data in this image");
-               }
                if (reqMimeType.find("image/png") != std::string::npos) { // look for substring to catch "Lazy" MIME types
-                   response->set_mime_type(reqMimeType);
+                   response->set_mime_type("image/png");
                    std::vector<uchar> chbuf;
                    chbuf.resize(5*1024*1024);
                    cv::Mat cvConverted(m_rsp->color_height, m_rsp->color_width, CV_8UC3);
@@ -106,9 +106,10 @@ class CameraServiceImpl final : public CameraService::Service {
                    response->set_image(s);
                } else if (reqMimeType.find("image/vnd.viam.rgba") != std::string::npos) {
                    response->set_mime_type(reqMimeType);
-                   cv::Mat cvConverted(m_rsp->color_height, m_rsp->color_width, CV_16UC4);
-                   cv::cvtColor(output->pic_cv, cvConverted, cv::COLOR_BGR2RGBA, 4);
+                   cv::Mat cvConverted(m_rsp->color_height, m_rsp->color_width, CV_8UC3);
+                   cv::cvtColor(output->pic_cv, cvConverted, cv::COLOR_BGR2RGB);
                     std::string s(cvConverted.datastart, cvConverted.dataend);
+                    std::cout << "string length is " << s.length() << "bytes" << std::endl;
                    response->set_image(s);
                } else { 
                    // return jpeg if none specified
@@ -129,9 +130,6 @@ class CameraServiceImpl final : public CameraService::Service {
                }
            }
            if (reqName == "depth") {
-               if (output->depth_cv.empty()) {
-                  return grpc::Status(grpc::StatusCode::UNAVAILABLE, "no data in this image");
-               }
                if (reqMimeType.find("image/jpeg") != std::string::npos) {
                    response->set_mime_type(reqMimeType);
                    std::vector<uchar> chbuf;
@@ -141,7 +139,7 @@ class CameraServiceImpl final : public CameraService::Service {
                    response->set_image(s);
                } else if (reqMimeType.find("image/vnd.viam.rgba") != std::string::npos) {
                    response->set_mime_type(reqMimeType);
-                   cv::Mat cvConverted(m_rsp->depth_height, m_rsp->depth_width, CV_16UC4);
+                   cv::Mat cvConverted(m_rsp->depth_height, m_rsp->depth_width, CV_8UC4);
                    cv::cvtColor(output->depth_cv, cvConverted, cv::COLOR_GRAY2RGBA, 4);
                     std::string s(cvConverted.datastart, cvConverted.dataend);
                    response->set_image(s);
@@ -160,16 +158,17 @@ class CameraServiceImpl final : public CameraService::Service {
                    response->set_image(s);
                }
            }
+           std::cout << "response mime type: " << response->mime_type() << std::endl;
 		   return grpc::Status::OK;
        }
 
        ::grpc::Status GetPointCloud(ServerContext* context, 
                const GetPointCloudRequest* request, 
                GetPointCloudResponse* response) override {
-           auto output = CameraState::get()->getCameraOutput(0);
-           if (output->points.size() == 0) {
-              return grpc::Status(grpc::StatusCode::UNAVAILABLE, "no data in this pointcloud");
+           if (!CameraState::get()->ready) {
+              return grpc::Status(grpc::StatusCode::UNAVAILABLE, "camera not ready");
            }
+           auto output = CameraState::get()->getCameraOutput(0);
            // create the pcd file
            std::stringbuf buffer;
            std::ostream oss(&buffer);
@@ -248,6 +247,7 @@ class RobotServiceImpl final : public RobotService::Service {
 
 void cameraThread(rs2::pipeline p) {
     CameraState::get()->addCamera();
+    CameraState::get()->ready = 0;
     rs2::align alignment(RS2_STREAM_COLOR); // align to the color camera's origin
     while (true) {
         auto start = std::chrono::high_resolution_clock::now();
@@ -260,13 +260,13 @@ void cameraThread(rs2::pipeline p) {
         try {
             output->pic_cv = cv::Mat(color.get_height(), color.get_width(), CV_8UC3, (void*)(color.get_data()));
         } catch (std::exception& e) {
-            std::cout << "Exception while constructing matrix for color frame: " << e.what() << std::endl;
+            std::cout << "intelGRPCserver: Exception while constructing matrix for color frame: " << e.what() << std::endl;
         }
         // get depth
         try {
             output->depth_cv = cv::Mat(depth.get_height(), depth.get_width(), CV_16U, (void*)(depth.get_data()));
         } catch (std::exception& e) {
-            std::cout << "Exception while constructing matrix for depth frame: " << e.what() << std::endl;
+            std::cout << "intelGRPCserver: Exception while constructing matrix for depth frame: " << e.what() << std::endl;
         }
         // get points
         rs2::pointcloud pc;
@@ -281,11 +281,11 @@ void cameraThread(rs2::pipeline p) {
         CameraState::get()->setCameraOutput(0, output);
         auto finish = std::chrono::high_resolution_clock::now();
         DEBUG(std::chrono::duration_cast<std::chrono::milliseconds>(finish - start).count() << "ms");
-        CameraState::get()->ready = 1;
         if (time(0) - CameraState::get()->getLastRequest() > 30) {
             DEBUG("sleeping");
             sleep(1);
         }
+        CameraState::get()->ready = 1;
     }
 };
 
@@ -303,14 +303,14 @@ rs2::pipeline startPipeline(int width, int height, RealSenseProperties* rsp) {
 
    rs2::pipeline pipe;
    auto serial = selected_device.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER);
-   std::cout << "got serial: " << serial << std::endl;
+   std::cout << "intelGRPCserver: got serial: " << serial << std::endl;
 
    rs2::config cfg;
    cfg.enable_device(serial);
    try {
        cfg.enable_stream(RS2_STREAM_COLOR, width, height, RS2_FORMAT_RGB8); // 0 width or height indicates any
    } catch (std::exception& e) {
-       std::cout << "Exception while enabling (" << width << ", " << height <<") stream: " << e.what() << std::endl;
+       std::cout << "intelGRPCserver: Exception while enabling (" << width << ", " << height <<") stream: " << e.what() << std::endl;
        exit(-1);
    }
    cfg.enable_stream(RS2_STREAM_DEPTH);
@@ -342,7 +342,7 @@ rs2::pipeline startPipeline(int width, int height, RealSenseProperties* rsp) {
 
 int main(int argc, char* argv[]) {
     if (argc == 1) {
-        std::cout << "optional arguments are: port_number, image_width, image_height." << std::endl;
+        std::cout << "intelGRPCserver: optional arguments are: port_number, image_width, image_height." << std::endl;
     }
     std::string port = "8085";
     std::string x_res = "";
@@ -364,14 +364,13 @@ int main(int argc, char* argv[]) {
     RobotServiceImpl robotService;
     CameraServiceImpl cameraService(rsp);
     grpc::EnableDefaultHealthCheckService(true);
-    // grpc::reflection::InitProtoReflectionServerBuilderPlugin();
     ServerBuilder builder;
     std::string address = "0.0.0.0:" + port;
     builder.AddListeningPort(address, grpc::InsecureServerCredentials());
     builder.RegisterService(&robotService);
     builder.RegisterService(&cameraService);
     std::unique_ptr<Server> server(builder.BuildAndStart());
-    std::cout << "Starting to listen on " << address << std::endl;
+    std::cout << "intelGRPCserver: Starting to listen on " << address << std::endl;
     server->Wait();
     return 0;
 }
