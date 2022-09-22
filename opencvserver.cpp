@@ -87,11 +87,11 @@ void cameraThread() {
         output->ppmdata = my_write_ppm((const char*)frame.data, output->width,
                                        output->height, 3);
 
-        CameraState::get()->cameras[0] = output;
+        CameraState::get()->setCameraOutput(0, output);
 
         CameraState::get()->ready = 1;
 
-        if (time(0) - CameraState::get()->lastRequest > 30) {
+        if (time(0) - CameraState::get()->getLastRequest() > 30) {
             DEBUG("sleeping");
             sleep(1);
         }
@@ -100,7 +100,7 @@ void cameraThread() {
 
 int main(int argc, char** argv) {
     TheCamera = findCamera();
-    CameraState::get()->cameras.push_back(0);
+    CameraState::get()->addCamera();
 
     int port = 8182;
 
