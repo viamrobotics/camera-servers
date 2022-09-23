@@ -11,7 +11,7 @@
 * [libopencv](https://opencv.org/releases/)
   * In most apt repos `sudo apt install libopencv-dev`
   * Needed for all servers in order to create depth png endpoint.
-* [gRPC](https://github.com/viamrobotics/rdk/tree/main/grpc/cpp)
+* [gRPC](https://github.com/viamrobotics/api)
   * Needed for gRPC servers
 * [openssl]
   * Needed for gRPC servers
@@ -56,4 +56,4 @@ sudo make install
 ### If none of that works, try this:
 https://github.com/IntelRealSense/librealsense/blob/master/doc/libuvc_installation.md
 
-Lastly, to use a local copy of RDK see https://github.com/viamrobotics/rdk/blob/main/grpc/cpp/README.md for setting up required grpc components and after doing the `make setup buf` in grpc/cpp inside RDK, set `RDK_SOURCE_DIR` appropriately and build.
+Lastly, to use a local copy of of the Viam API https://github.com/viamrobotics/api for setting up required grpc components  or use `make buf`. 

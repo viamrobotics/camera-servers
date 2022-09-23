@@ -1,7 +1,7 @@
 GRPCDIR = ./
 
-ifdef RDK_SOURCE_DIR
-GRPCDIR=$(RDK_SOURCE_DIR)/grpc/cpp/gen
+ifdef API_SOURCE_DIR
+GRPCDIR=$(API_SOURCE_DIR)/grpc/cpp/gen
 else
 ifneq ($(wildcard ./grpc/cpp/gen),)
 GRPCDIR=./grpc/cpp/gen
