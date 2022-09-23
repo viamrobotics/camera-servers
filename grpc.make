@@ -6,7 +6,7 @@ else
 ifneq ($(wildcard ./grpc/cpp/gen),)
 GRPCDIR=./grpc/cpp/gen
 else
-GRPCDIR=./api/grpc/cpp/gen
+GRPCDIR=./grpc/cpp/gen
 endif
 endif
 
