@@ -9,14 +9,14 @@
 #include <string>
 #include <vector>
 
-class Vertex { 
-    public:
-        Vertex() {};
-        Vertex(float _x, float _y, float _z): x(_x), y(_y), z(_z) {};
+class Vertex {
+   public:
+    Vertex(){};
+    Vertex(float _x, float _y, float _z) : x(_x), y(_y), z(_z){};
 
-        float x;
-        float y;
-        float z;
+    float x;
+    float y;
+    float z;
 };
 
 class CameraOutput {
