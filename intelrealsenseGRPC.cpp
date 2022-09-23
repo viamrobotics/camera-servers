@@ -167,6 +167,8 @@ class CameraServiceImpl final : public CameraService::Service {
         if (!CameraState::get()->ready) {
             return grpc::Status(grpc::StatusCode::UNAVAILABLE, "camera not ready");
         }
+        return grpc::Status(grpc::StatusCode::UNIMPLEMENTED, "GetPointCloud unmiplemented");
+        /* point clouds slow the server loop down too much right now
         auto output = CameraState::get()->getCameraOutput(0);
         // create the pcd file
         std::stringbuf buffer;
@@ -193,6 +195,7 @@ class CameraServiceImpl final : public CameraService::Service {
         response->set_mime_type("pointcloud/pcd");
         response->set_point_cloud(buffer.str());
         return grpc::Status::OK;
+        */
     }
 
     ::grpc::Status GetProperties(ServerContext* context, const GetPropertiesRequest* request,
@@ -287,20 +290,11 @@ void cameraThread(rs2::pipeline p) {
                       << e.what() << std::endl;
             continue;
         }
-        // get points
-        rs2::pointcloud pc;
-        auto points = pc.calculate(depth);
-        auto vertices = points.get_vertices();
-        std::vector<Vertex> cloud_points(points.size());  // probably there is a smarter way to
-                                                          // extract point info from rs2::vertices
-        for (int i = 0; i < points.size(); i++) {
-            cloud_points.push_back(Vertex(vertices[i].x, vertices[i].y, vertices[i].z));
-        }
-        output->points = cloud_points;
         // set output
         CameraState::get()->setCameraOutput(0, output);
         auto finish = std::chrono::high_resolution_clock::now();
-        DEBUG(std::chrono::duration_cast<std::chrono::milliseconds>(finish - start).count()
+        DEBUG("time: "
+              << std::chrono::duration_cast<std::chrono::milliseconds>(finish - start).count()
               << "ms");
         if (time(0) - CameraState::get()->getLastRequest() > 30) {
             DEBUG("sleeping");
