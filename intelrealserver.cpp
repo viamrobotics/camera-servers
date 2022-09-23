@@ -75,23 +75,20 @@ void cameraThread() {
             auto vf = frames.get_color_frame();
 
             assert(vf.get_bytes_per_pixel() == 3);
-            assert(vf.get_stride_in_bytes() ==
-                   (vf.get_width() * vf.get_bytes_per_pixel()));
+            assert(vf.get_stride_in_bytes() == (vf.get_width() * vf.get_bytes_per_pixel()));
 
             output->width = vf.get_width();
             output->height = vf.get_height();
-            output->ppmdata =
-                my_write_ppm((const char*)vf.get_data(), vf.get_width(),
-                             vf.get_height(), vf.get_bytes_per_pixel());
+            output->ppmdata = my_write_ppm((const char*)vf.get_data(), vf.get_width(),
+                                           vf.get_height(), vf.get_bytes_per_pixel());
             try {
-                output->pic_cv = cv::Mat(vf.get_height(), vf.get_width(),
-                                         CV_8UC3, (void*)(vf.get_data()));
+                output->pic_cv =
+                    cv::Mat(vf.get_height(), vf.get_width(), CV_8UC3, (void*)(vf.get_data()));
             } catch (std::exception& e) {
                 // Catch exceptions, since constructing the matrix can fail
                 // when the size is 0.
-                std::cout
-                    << "Exception while constructing matrix for color frame: "
-                    << e.what() << std::endl;
+                std::cout << "Exception while constructing matrix for color frame: " << e.what()
+                          << std::endl;
                 output->pic_cv = cv::Mat();
             }
 
@@ -100,31 +97,27 @@ void cameraThread() {
             auto depth = frames.get_depth_frame();
             output->depth_width = depth.get_width();
             output->depth_height = depth.get_height();
-            output->add_depth(depth.get_bytes_per_pixel(), depth.get_units(),
-                              depth.get_width(), depth.get_height(),
-                              (const char*)depth.get_data());
+            output->add_depth(depth.get_bytes_per_pixel(), depth.get_units(), depth.get_width(),
+                              depth.get_height(), (const char*)depth.get_data());
 
             int w = output->depth_width;
             int h = output->depth_height;
             cv::Mat cvBuf(h, w, CV_16U);
-            const uint16_t* z_pixels =
-                reinterpret_cast<const uint16_t*>(depth.get_data());
+            const uint16_t* z_pixels = reinterpret_cast<const uint16_t*>(depth.get_data());
             for (int y = 0; y < h; y++) {
                 for (int x = 0; x < w; x++) {
                     cvBuf.at<uint16_t>(y, x) = z_pixels[y * w + x];
                 }
             }
             output->depth_cv = cvBuf;
-            DEBUG("middle distance: " << depth.get_distance(
-                      depth.get_width() / 2, depth.get_height() / 2));
+            DEBUG("middle distance: " << depth.get_distance(depth.get_width() / 2,
+                                                            depth.get_height() / 2));
 
             CameraState::get()->setCameraOutput(num++, output);
         }
 
         auto finish = std::chrono::high_resolution_clock::now();
-        DEBUG(std::chrono::duration_cast<std::chrono::milliseconds>(finish -
-                                                                    start)
-                  .count()
+        DEBUG(std::chrono::duration_cast<std::chrono::milliseconds>(finish - start).count()
               << "ms");
 
         // Camera will only enter a ready state if all cameras have returned valid 

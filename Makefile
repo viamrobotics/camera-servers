@@ -9,7 +9,7 @@ LIB_FILES = cameraserver.cpp
 default: intelrealserver royaleserver 
 
 format: *.h *.cpp
-	clang-format -i --style="{BasedOnStyle: Google, IndentWidth: 4}" *.cpp *.h
+	clang-format -i --style="{BasedOnStyle: Google, IndentWidth: 4, ColumnLimit: 100}" *.cpp *.h
 
 all: default opencv
 

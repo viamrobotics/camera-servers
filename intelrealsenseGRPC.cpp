@@ -78,35 +78,31 @@ class CameraServiceImpl final : public CameraService::Service {
     CameraServiceImpl(std::shared_ptr<RealSenseProperties> rsp) : m_rsp(rsp){};
     virtual ~CameraServiceImpl() = default;
 
-    ::grpc::Status GetImage(ServerContext* context,
-                            const GetImageRequest* request,
+    ::grpc::Status GetImage(ServerContext* context, const GetImageRequest* request,
                             GetImageResponse* response) override {
         std::string reqName = request->name();
         std::string reqMimeType = request->mime_type();
         if (!CameraState::get()->ready) {
-            return grpc::Status(grpc::StatusCode::UNAVAILABLE,
-                                "camera not ready");
+            return grpc::Status(grpc::StatusCode::UNAVAILABLE, "camera not ready");
         }
         auto output = CameraState::get()->getCameraOutput(0);
         if (reqName == "color") {
-            if (reqMimeType.find("image/png") !=
-                std::string::npos) {  // look for substring to catch "Lazy" MIME
-                                      // types
-                response->set_mime_type("image/png");
+            if (reqMimeType.find("image/png") != std::string::npos) {  // look for substring to
+                                                                       // catch "Lazy" MIME types
+                response->set_mime_type(reqMimeType);
                 std::vector<uchar> chbuf;
                 chbuf.resize(5 * 1024 * 1024);
-                cv::Mat cvConverted(m_rsp->color_height, m_rsp->color_width,
-                                    CV_8UC3);
+                cv::Mat cvConverted(m_rsp->color_height, m_rsp->color_width, CV_8UC3);
                 cv::cvtColor(output->pic_cv, cvConverted, cv::COLOR_BGR2RGB);
                 cv::imencode(".png", cvConverted, chbuf);
                 std::string s(chbuf.begin(), chbuf.end());
                 response->set_image(s);
-                /* currently dont support raw 16bit RGBA inputs
+                /* [RSDK-683] currently dont support raw 16bit RGBA inputs
                 } else if (reqMimeType.find("image/vnd.viam.rgba") !=
                 std::string::npos) { response->set_mime_type(reqMimeType);
                     cv::Mat cvConverted(m_rsp->color_height, m_rsp->color_width,
-                CV_8UC3); cv::cvtColor(output->pic_cv, cvConverted,
-                cv::COLOR_BGR2RGB); std::string s(cvConverted.datastart,
+                CV_16UC4); cv::cvtColor(output->pic_cv, cvConverted,
+                cv::COLOR_BGR2RGBA, 4); std::string s(cvConverted.datastart,
                 cvConverted.dataend); response->set_image(s);
                 */
             } else {
@@ -114,8 +110,7 @@ class CameraServiceImpl final : public CameraService::Service {
                 if (reqMimeType.find("image/jpeg") != std::string::npos) {
                     response->set_mime_type(reqMimeType);
                 } else if ((reqMimeType == "") ||
-                           (reqMimeType.find("image/vnd.viam.rgba") !=
-                            std::string::npos)) {
+                           (reqMimeType.find("image/vnd.viam.rgba") != std::string::npos)) {
                     response->set_mime_type("image/jpeg");
                 } else {
                     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT,
@@ -123,8 +118,7 @@ class CameraServiceImpl final : public CameraService::Service {
                 }
                 std::vector<uchar> chbuf;
                 chbuf.resize(5 * 1024 * 1024);
-                cv::Mat cvConverted(m_rsp->color_height, m_rsp->color_width,
-                                    CV_8UC3);
+                cv::Mat cvConverted(m_rsp->color_height, m_rsp->color_width, CV_8UC3);
                 cv::cvtColor(output->pic_cv, cvConverted, cv::COLOR_BGR2RGB);
                 cv::imencode(".jpg", cvConverted, chbuf);
                 std::string s(chbuf.begin(), chbuf.end());
@@ -139,7 +133,7 @@ class CameraServiceImpl final : public CameraService::Service {
                 cv::imencode(".jpg", output->depth_cv, chbuf);
                 std::string s(chbuf.begin(), chbuf.end());
                 response->set_image(s);
-                /* currently dont support raw 16bit RGBA inputs
+                /* [RSDK-683] currently dont support raw 16bit RGBA inputs
                 } else if (reqMimeType.find("image/vnd.viam.rgba") !=
                 std::string::npos) { response->set_mime_type(reqMimeType);
                     cv::Mat cvConverted(m_rsp->depth_height, m_rsp->depth_width,
@@ -152,8 +146,7 @@ class CameraServiceImpl final : public CameraService::Service {
                 if (reqMimeType.find("image/png") != std::string::npos) {
                     response->set_mime_type(reqMimeType);
                 } else if ((reqMimeType == "") ||
-                           (reqMimeType.find("image/vnd.viam.rgba") !=
-                            std::string::npos)) {
+                           (reqMimeType.find("image/vnd.viam.rgba") != std::string::npos)) {
                     response->set_mime_type("image/png");
                 } else {
                     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT,
@@ -169,12 +162,10 @@ class CameraServiceImpl final : public CameraService::Service {
         return grpc::Status::OK;
     }
 
-    ::grpc::Status GetPointCloud(ServerContext* context,
-                                 const GetPointCloudRequest* request,
+    ::grpc::Status GetPointCloud(ServerContext* context, const GetPointCloudRequest* request,
                                  GetPointCloudResponse* response) override {
         if (!CameraState::get()->ready) {
-            return grpc::Status(grpc::StatusCode::UNAVAILABLE,
-                                "camera not ready");
+            return grpc::Status(grpc::StatusCode::UNAVAILABLE, "camera not ready");
         }
         auto output = CameraState::get()->getCameraOutput(0);
         // create the pcd file
@@ -204,12 +195,10 @@ class CameraServiceImpl final : public CameraService::Service {
         return grpc::Status::OK;
     }
 
-    ::grpc::Status GetProperties(ServerContext* context,
-                                 const GetPropertiesRequest* request,
+    ::grpc::Status GetProperties(ServerContext* context, const GetPropertiesRequest* request,
                                  GetPropertiesResponse* response) override {
         response->set_supports_pcd(true);
-        IntrinsicParameters* intrinsics =
-            response->mutable_intrinsic_parameters();
+        IntrinsicParameters* intrinsics = response->mutable_intrinsic_parameters();
         auto reqName = request->name();
         if (reqName == "color") {
             intrinsics->set_width_px(m_rsp->color_width);
@@ -231,15 +220,12 @@ class CameraServiceImpl final : public CameraService::Service {
         return grpc::Status::OK;
     }
 
-    virtual std::string name() const {
-        return std::string("IntelRealSenseServer");
-    }
+    virtual std::string name() const { return std::string("IntelRealSenseServer"); }
 };
 
 class RobotServiceImpl final : public RobotService::Service {
    public:
-    grpc::Status ResourceNames(ServerContext* context,
-                               const ResourceNamesRequest* request,
+    grpc::Status ResourceNames(ServerContext* context, const ResourceNamesRequest* request,
                                ResourceNamesResponse* response) override {
         ResourceName* name = response->add_resources();
         name->set_namespace_("rdk");
@@ -259,53 +245,62 @@ class RobotServiceImpl final : public RobotService::Service {
 void cameraThread(rs2::pipeline p) {
     CameraState::get()->addCamera();
     CameraState::get()->ready = 0;
-    rs2::align alignment(
-        RS2_STREAM_COLOR);  // align to the color camera's origin
+    rs2::align alignment(RS2_STREAM_COLOR);  // align to the color camera's origin
     while (true) {
         auto start = std::chrono::high_resolution_clock::now();
         std::shared_ptr<CameraOutput> output(new CameraOutput());
-        rs2::frameset frames = p.wait_for_frames();
-        frames = alignment.process(
-            frames);  // this handles the geometry so that the x/y of the depth
-                      // and color are the same
+        rs2::frameset frames;
+        uint timeout = 1000;
+        bool succ = p.try_wait_for_frames(&frames, timeout);
+        if (!succ) {
+            std::cout << "intelGRPCserver: could not get frames from realsense after " << timeout
+                      << "ms" << std::endl;
+            continue;
+        }
+        try {
+            frames = alignment.process(frames);
+        } catch (std::exception& e) {
+            // Catch exceptions, since alignment can fail
+            std::cout << "intelGRPCserver: Exception while aligning images: " << e.what()
+                      << std::endl;
+            continue;
+        }
         auto color = frames.get_color_frame();
         auto depth = frames.get_depth_frame();
         // get color
         try {
-            output->pic_cv = cv::Mat(color.get_height(), color.get_width(),
-                                     CV_8UC3, (void*)(color.get_data()));
+            output->pic_cv =
+                cv::Mat(color.get_height(), color.get_width(), CV_8UC3, (void*)(color.get_data()));
         } catch (std::exception& e) {
             std::cout << "intelGRPCserver: Exception while constructing matrix "
                          "for color frame: "
                       << e.what() << std::endl;
+            continue;
         }
         // get depth
         try {
-            output->depth_cv = cv::Mat(depth.get_height(), depth.get_width(),
-                                       CV_16U, (void*)(depth.get_data()));
+            output->depth_cv =
+                cv::Mat(depth.get_height(), depth.get_width(), CV_16U, (void*)(depth.get_data()));
         } catch (std::exception& e) {
             std::cout << "intelGRPCserver: Exception while constructing matrix "
                          "for depth frame: "
                       << e.what() << std::endl;
+            continue;
         }
         // get points
         rs2::pointcloud pc;
         auto points = pc.calculate(depth);
         auto vertices = points.get_vertices();
-        std::vector<Vertex> cloud_points(
-            points.size());  // probably there is a smarter way to extract point info
-                             // from rs2::vertices
+        std::vector<Vertex> cloud_points(points.size());  // probably there is a smarter way to
+                                                          // extract point info from rs2::vertices
         for (int i = 0; i < points.size(); i++) {
-            cloud_points.push_back(
-                Vertex(vertices[i].x, vertices[i].y, vertices[i].z));
+            cloud_points.push_back(Vertex(vertices[i].x, vertices[i].y, vertices[i].z));
         }
         output->points = cloud_points;
         // set output
         CameraState::get()->setCameraOutput(0, output);
         auto finish = std::chrono::high_resolution_clock::now();
-        DEBUG(std::chrono::duration_cast<std::chrono::milliseconds>(finish -
-                                                                    start)
-                  .count()
+        DEBUG(std::chrono::duration_cast<std::chrono::milliseconds>(finish - start).count()
               << "ms");
         if (time(0) - CameraState::get()->getLastRequest() > 30) {
             DEBUG("sleeping");
@@ -320,12 +315,10 @@ rs2::pipeline startPipeline(int width, int height, RealSenseProperties* rsp) {
     rs2::device_list devices = ctx.query_devices();
     rs2::device selected_device;
     if (devices.size() == 0) {
-        std::cerr << "No device connected, please connect a RealSense device"
-                  << std::endl;
+        std::cerr << "No device connected, please connect a RealSense device" << std::endl;
         exit(-1);
-    } else {
-        selected_device = devices[0];
     }
+    selected_device = devices[0];
 
     rs2::pipeline pipe;
     auto serial = selected_device.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER);
@@ -337,8 +330,8 @@ rs2::pipeline startPipeline(int width, int height, RealSenseProperties* rsp) {
         cfg.enable_stream(RS2_STREAM_COLOR, width, height,
                           RS2_FORMAT_RGB8);  // 0 width or height indicates any
     } catch (std::exception& e) {
-        std::cout << "intelGRPCserver: Exception while enabling (" << width
-                  << ", " << height << ") stream: " << e.what() << std::endl;
+        std::cout << "intelGRPCserver: Exception while enabling (" << width << ", " << height
+                  << ") stream: " << e.what() << std::endl;
         exit(-1);
     }
     cfg.enable_stream(RS2_STREAM_DEPTH);
@@ -347,13 +340,11 @@ rs2::pipeline startPipeline(int width, int height, RealSenseProperties* rsp) {
     p.start(cfg);
 
     // get properties
-    auto const color_stream = p.get_active_profile()
-                                  .get_stream(RS2_STREAM_COLOR)
-                                  .as<rs2::video_stream_profile>();
+    auto const color_stream =
+        p.get_active_profile().get_stream(RS2_STREAM_COLOR).as<rs2::video_stream_profile>();
     auto color_intrin = color_stream.get_intrinsics();
-    auto const depth_stream = p.get_active_profile()
-                                  .get_stream(RS2_STREAM_DEPTH)
-                                  .as<rs2::video_stream_profile>();
+    auto const depth_stream =
+        p.get_active_profile().get_stream(RS2_STREAM_DEPTH).as<rs2::video_stream_profile>();
     auto depth_intrin = depth_stream.get_intrinsics();
     rsp->color_width = color_intrin.width;
     rsp->color_height = color_intrin.height;
@@ -391,8 +382,8 @@ int main(int argc, char* argv[]) {
     }
     // get the pipeline and fill the properties
     auto rsp = make_shared<RealSenseProperties>();
-    rs2::pipeline pipe = startPipeline(std::atoi(x_res.c_str()),
-                                       std::atoi(y_res.c_str()), rsp.get());
+    rs2::pipeline pipe =
+        startPipeline(std::atoi(x_res.c_str()), std::atoi(y_res.c_str()), rsp.get());
     std::thread t(cameraThread, pipe);
     // define the services
     RobotServiceImpl robotService;
@@ -404,8 +395,7 @@ int main(int argc, char* argv[]) {
     builder.RegisterService(&robotService);
     builder.RegisterService(&cameraService);
     std::unique_ptr<Server> server(builder.BuildAndStart());
-    std::cout << "intelGRPCserver: Starting to listen on " << address
-              << std::endl;
+    std::cout << "intelGRPCserver: Starting to listen on " << address << std::endl;
     server->Wait();
     return 0;
 }
