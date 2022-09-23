@@ -293,7 +293,7 @@ void cameraThread(rs2::pipeline p) {
         auto points = pc.calculate(depth);
         auto vertices = points.get_vertices();
         std::vector<Vertex> cloud_points(
-            points.size());  // probably a smarter way to extract point info
+            points.size());  // probably there is a smarter way to extract point info
                              // from rs2::vertices
         for (int i = 0; i < points.size(); i++) {
             cloud_points.push_back(
