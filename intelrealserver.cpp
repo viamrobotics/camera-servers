@@ -12,6 +12,8 @@
 //#define DEBUG(x) std::cout << x << std::endl
 #define DEBUG(x)
 
+auto waitForFrameTimeout = 1000;
+
 void cameraThread() {
     rs2::context ctx;
 
@@ -41,6 +43,8 @@ void cameraThread() {
     rs2::align alignment(RS2_STREAM_COLOR);
     // rs2::align alignment(RS2_STREAM_DEPTH);
 
+    auto ready = true;
+    
     while (true) {
         auto start = std::chrono::high_resolution_clock::now();
 
@@ -49,9 +53,10 @@ void cameraThread() {
             std::shared_ptr<CameraOutput> output(new CameraOutput());
 
             rs2::frameset frames;
-            auto succ = p.try_wait_for_frames(&frames, 1000);
+            auto succ = p.try_wait_for_frames(&frames, waitForFrameTimeout);
             if (!succ) {
-                DEBUG("Failed to get frame, skipping...");
+                std::cout << "Failed to get frame, skipping..."  << std::endl;
+                ready = false;
                 continue;
             }
             
@@ -62,6 +67,7 @@ void cameraThread() {
             } catch (std::exception& e) {
                 // Catch exceptions, since alignment can fail
                 std::cout << "Exception while aligning images: " << e.what() << std::endl;
+                ready = false;
                 continue;
             }
 
@@ -98,16 +104,16 @@ void cameraThread() {
                               depth.get_width(), depth.get_height(),
                               (const char*)depth.get_data());
 
-	    int w = output->depth_width;
-	    int h = output->depth_height;
-	    cv::Mat cvBuf(h, w, CV_16U);
-	    const uint16_t *z_pixels = reinterpret_cast<const uint16_t*>(depth.get_data());
-	    for (int y = 0; y < h; y++) {
-	      for (int x = 0; x < w; x++) { 
-		cvBuf.at<uint16_t>(y,x) = z_pixels[y*w+x];
-	      }
-	    }
-	    output->depth_cv = cvBuf;
+            int w = output->depth_width;
+            int h = output->depth_height;
+            cv::Mat cvBuf(h, w, CV_16U);
+            const uint16_t *z_pixels = reinterpret_cast<const uint16_t*>(depth.get_data());
+            for (int y = 0; y < h; y++) {
+                for (int x = 0; x < w; x++) { 
+                    cvBuf.at<uint16_t>(y,x) = z_pixels[y*w+x];
+                }
+            }
+            output->depth_cv = cvBuf;
             DEBUG("middle distance: " << depth.get_distance(
                       depth.get_width() / 2, depth.get_height() / 2));
 
@@ -120,7 +126,11 @@ void cameraThread() {
                   .count()
               << "ms");
 
-        CameraState::get()->ready = 1;
+        // Camera will only enter a ready state if all cameras have returned valid 
+        // aligned frames
+        if (ready) {
+            CameraState::get()->ready = 1;
+        }
 
         if (time(0) - CameraState::get()->lastRequest > 30) {
             DEBUG("sleeping");
