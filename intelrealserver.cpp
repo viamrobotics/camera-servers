@@ -12,6 +12,8 @@
 //#define DEBUG(x) std::cout << x << std::endl
 #define DEBUG(x)
 
+auto waitForFrameTimeout = 1000;
+
 void cameraThread() {
     rs2::context ctx;
 
@@ -41,17 +43,33 @@ void cameraThread() {
     rs2::align alignment(RS2_STREAM_COLOR);
     // rs2::align alignment(RS2_STREAM_DEPTH);
 
+    auto ready = true;
+    
     while (true) {
         auto start = std::chrono::high_resolution_clock::now();
 
         int num = 0;
         for (auto& p : pipelines) {
             std::shared_ptr<CameraOutput> output(new CameraOutput());
-            rs2::frameset frames = p.wait_for_frames();
 
+            rs2::frameset frames;
+            auto succ = p.try_wait_for_frames(&frames, waitForFrameTimeout);
+            if (!succ) {
+                std::cout << "Failed to get frame, skipping..."  << std::endl;
+                ready = false;
+                continue;
+            }
+            
             // this handles the geometry so that the
             // x/y of the depth and color are the same
-            frames = alignment.process(frames);
+            try {
+                frames = alignment.process(frames);
+            } catch (std::exception& e) {
+                // Catch exceptions, since alignment can fail
+                std::cout << "Exception while aligning images: " << e.what() << std::endl;
+                ready = false;
+                continue;
+            }
 
             // do color frame
             auto vf = frames.get_color_frame();
@@ -109,7 +127,11 @@ void cameraThread() {
                   .count()
               << "ms");
 
-        CameraState::get()->ready = 1;
+        // Camera will only enter a ready state if all cameras have returned valid 
+        // aligned frames
+        if (ready) {
+            CameraState::get()->ready = 1;
+        }
 
         if (time(0) - CameraState::get()->getLastRequest() > 30) {
             DEBUG("sleeping");
