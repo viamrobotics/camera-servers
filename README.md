@@ -11,9 +11,6 @@
 * [libopencv](https://opencv.org/releases/)
   * In most apt repos `sudo apt install libopencv-dev`
   * Needed for all servers in order to create depth png endpoint.
-* [libpcl](https://github.com/PointCloudLibrary/pcl)
-  * In most apt repos `sudo apt install libpcl-dev`
-  * Needed for making point clouds in the Intel RealSense GRPC server.
 * [gRPC](https://github.com/viamrobotics/rdk/tree/main/grpc/cpp)
   * Needed for gRPC servers
 * [openssl]
