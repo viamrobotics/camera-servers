@@ -32,7 +32,7 @@ void cameraThread() {
         pipe.start(cfg);
         pipelines.push_back(pipe);
 
-        CameraState::get()->cameras.push_back(0);
+        CameraState::get()->addCamera();
     }
 
     if (pipelines.size() == 0) {
@@ -107,17 +107,17 @@ void cameraThread() {
             int w = output->depth_width;
             int h = output->depth_height;
             cv::Mat cvBuf(h, w, CV_16U);
-            const uint16_t *z_pixels = reinterpret_cast<const uint16_t*>(depth.get_data());
+            const uint16_t* z_pixels = reinterpret_cast<const uint16_t*>(depth.get_data());
             for (int y = 0; y < h; y++) {
-                for (int x = 0; x < w; x++) { 
-                    cvBuf.at<uint16_t>(y,x) = z_pixels[y*w+x];
+                for (int x = 0; x < w; x++) {
+                    cvBuf.at<uint16_t>(y, x) = z_pixels[y * w + x];
                 }
             }
             output->depth_cv = cvBuf;
             DEBUG("middle distance: " << depth.get_distance(
                       depth.get_width() / 2, depth.get_height() / 2));
 
-            CameraState::get()->cameras[num++] = output;
+            CameraState::get()->setCameraOutput(num++, output);
         }
 
         auto finish = std::chrono::high_resolution_clock::now();
@@ -132,7 +132,7 @@ void cameraThread() {
             CameraState::get()->ready = 1;
         }
 
-        if (time(0) - CameraState::get()->lastRequest > 30) {
+        if (time(0) - CameraState::get()->getLastRequest() > 30) {
             DEBUG("sleeping");
             sleep(1);
         }

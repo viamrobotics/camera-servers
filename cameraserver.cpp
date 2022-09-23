@@ -3,8 +3,8 @@
 #include "cameraserver.h"
 
 #include <iostream>
-#include <sstream>
 #include <opencv2/imgcodecs.hpp>
+#include <sstream>
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
@@ -33,6 +33,37 @@ CameraState* CameraState::get() {
     return myCameraState;
 }
 
+void CameraState::setLastRequest(time_t lastRequest) {
+    std::lock_guard<std::mutex> lock(_mutex);
+    _lastRequest = lastRequest;
+}
+
+time_t CameraState::getLastRequest() {
+    std::lock_guard<std::mutex> lock(_mutex);
+    return _lastRequest;
+}
+
+void CameraState::addCamera() {
+    std::lock_guard<std::mutex> lock(_mutex);
+    _cameras.push_back(0);
+}
+
+void CameraState::setCameraOutput(size_t i,
+                                  std::shared_ptr<CameraOutput> output) {
+    std::lock_guard<std::mutex> lock(_mutex);
+    _cameras[i] = output;
+}
+
+std::shared_ptr<CameraOutput> CameraState::getCameraOutput(size_t i) {
+    std::lock_guard<std::mutex> lock(_mutex);
+    return _cameras[i];
+}
+
+size_t CameraState::getNumCameras() {
+    std::lock_guard<std::mutex> lock(_mutex);
+    return _cameras.size();
+}
+
 using namespace httpserver;
 
 class hello_world_resource : public http_resource {
@@ -46,7 +77,7 @@ class hello_world_resource : public http_resource {
         os << "<html>";
         os << "<meta http-equiv=\"refresh\" content=\"1\" />";
         os << "<body>";
-        for (int i = 0; i < _cams->cameras.size(); i++) {
+        for (int i = 0; i < _cams->getNumCameras(); i++) {
             os << "<img width=600 src='/pic.png?num=" << i << "'/>";
         }
         os << "</body></html>";
@@ -106,9 +137,11 @@ class depth_resource_png : public camera_resource {
 
     const std::shared_ptr<http_response> myRender(CameraOutput* mine) {
         std::vector<uchar> chbuf;
-        chbuf.resize(512 * 1024); // just needs to be big enough. prob should be smarter.
+        chbuf.resize(
+            512 *
+            1024);  // just needs to be big enough. prob should be smarter.
         cv::imencode(".png", mine->depth_cv, chbuf);
-	    std::string s(chbuf.begin(), chbuf.end());
+        std::string s(chbuf.begin(), chbuf.end());
 
         return std::shared_ptr<http_response>(
             new string_response(s, 200, "image/png"));

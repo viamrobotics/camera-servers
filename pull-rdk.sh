@@ -1,17 +1,16 @@
 #!/bin/bash
 
 # If it already exists, just update
-if [ -d rdk-minimal/ ]
+if [ -d api/ ]
 then
-	cd rdk-minimal
+	cd api
 	git pull origin main
 else
-	mkdir rdk-minimal
-	cd rdk-minimal
+	mkdir api
+	cd api
 	git init -b main
-	git remote add origin git@github.com:viamrobotics/rdk.git
+	git remote add origin git@github.com:viamrobotics/api.git
 	git config pull.ff only
 	git fetch --depth=1 origin main
-	git sparse-checkout set --cone "proto" "buf.yaml" "buf.lock"
 	git pull origin main
 fi
