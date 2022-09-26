@@ -9,16 +9,6 @@
 #include <string>
 #include <vector>
 
-class Vertex {
-   public:
-    Vertex(){};
-    Vertex(float _x, float _y, float _z) : x(_x), y(_y), z(_z){};
-
-    float x;
-    float y;
-    float z;
-};
-
 class CameraOutput {
    public:
     CameraOutput() {}
@@ -32,7 +22,6 @@ class CameraOutput {
     std::string depth;
     cv::Mat pic_cv;
     cv::Mat depth_cv;
-    std::vector<Vertex> points;
 };
 
 class CameraState {

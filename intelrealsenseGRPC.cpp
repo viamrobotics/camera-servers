@@ -47,6 +47,7 @@ using viam::component::camera::v1::GetPointCloudResponse;
 using viam::component::camera::v1::GetPropertiesRequest;
 using viam::component::camera::v1::GetPropertiesResponse;
 using viam::component::camera::v1::IntrinsicParameters;
+using viam::component::camera::v1::DistortionParameters;
 using viam::robot::v1::ResourceNamesRequest;
 using viam::robot::v1::ResourceNamesResponse;
 using viam::robot::v1::RobotService;
@@ -61,6 +62,8 @@ class RealSenseProperties {
     float color_fy;
     float color_ppx;
     float color_ppy;
+    std::string color_distortion_model;
+    double color_distortion_parameters[5];
     // depth camera
     int depth_width;
     int depth_height;
@@ -68,6 +71,8 @@ class RealSenseProperties {
     float depth_fy;
     float depth_ppx;
     float depth_ppy;
+    std::string depth_distortion_model;
+    double depth_distortion_parameters[5];
 };
 
 class CameraServiceImpl final : public CameraService::Service {
@@ -200,24 +205,34 @@ class CameraServiceImpl final : public CameraService::Service {
 
     ::grpc::Status GetProperties(ServerContext* context, const GetPropertiesRequest* request,
                                  GetPropertiesResponse* response) override {
-        response->set_supports_pcd(true);
         IntrinsicParameters* intrinsics = response->mutable_intrinsic_parameters();
+        DistortionParameters* distortion = response->mutable_distortion_parameters();
         auto reqName = request->name();
         if (reqName == "color") {
+            response->set_supports_pcd(false);
             intrinsics->set_width_px(m_rsp->color_width);
             intrinsics->set_height_px(m_rsp->color_height);
             intrinsics->set_focal_x_px(m_rsp->color_fx);
             intrinsics->set_focal_y_px(m_rsp->color_fy);
             intrinsics->set_center_x_px(m_rsp->color_ppx);
             intrinsics->set_center_y_px(m_rsp->color_ppy);
+            distortion->set_model(m_rsp->color_distortion_model);
+            for (int i = 0; i < 5; i++) {
+                distortion->add_parameters(m_rsp->color_distortion_parameters[i]);
+            }
         }
         if (reqName == "depth") {
+            response->set_supports_pcd(true);
             intrinsics->set_width_px(m_rsp->depth_width);
             intrinsics->set_height_px(m_rsp->depth_height);
             intrinsics->set_focal_x_px(m_rsp->depth_fx);
             intrinsics->set_focal_y_px(m_rsp->depth_fy);
             intrinsics->set_center_x_px(m_rsp->depth_ppx);
             intrinsics->set_center_y_px(m_rsp->depth_ppy);
+            distortion->set_model(m_rsp->depth_distortion_model);
+            for (int i = 0; i < 5; i++) {
+                distortion->add_parameters(m_rsp->depth_distortion_parameters[i]);
+            }
         }
 
         return grpc::Status::OK;
@@ -251,7 +266,7 @@ void cameraThread(rs2::pipeline p) {
     rs2::align alignment(RS2_STREAM_COLOR);  // align to the color camera's origin
     while (true) {
         auto start = std::chrono::high_resolution_clock::now();
-        std::shared_ptr<CameraOutput> output(new CameraOutput());
+        auto  output = std::make_shared<CameraOutput>();
         rs2::frameset frames;
         uint timeout = 1000;
         bool succ = p.try_wait_for_frames(&frames, timeout);
@@ -346,12 +361,20 @@ rs2::pipeline startPipeline(int width, int height, RealSenseProperties* rsp) {
     rsp->color_fy = color_intrin.fy;
     rsp->color_ppx = color_intrin.ppx;
     rsp->color_ppy = color_intrin.ppy;
+    rsp->color_distortion_model = "brown_conrady";
+    for (int i = 0; i < 5; i++) {
+        rsp->color_distortion_parameters[i] = double(color_intrin.coeffs[i]);
+    }
     rsp->depth_width = depth_intrin.width;
     rsp->depth_height = depth_intrin.height;
     rsp->depth_fx = depth_intrin.fx;
     rsp->depth_fy = depth_intrin.fy;
     rsp->depth_ppx = depth_intrin.ppx;
     rsp->depth_ppy = depth_intrin.ppy;
+    rsp->depth_distortion_model = "no_distortion";
+    for (int i = 0; i < 5; i++) {
+        rsp->depth_distortion_parameters[i] = double(depth_intrin.coeffs[i]);
+    }
 
     return p;
 };
