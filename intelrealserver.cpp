@@ -43,9 +43,8 @@ void cameraThread() {
     rs2::align alignment(RS2_STREAM_COLOR);
     // rs2::align alignment(RS2_STREAM_DEPTH);
 
-    auto ready = true;
-    
     while (true) {
+        auto ready = true;
         auto start = std::chrono::high_resolution_clock::now();
 
         int num = 0;
@@ -55,11 +54,11 @@ void cameraThread() {
             rs2::frameset frames;
             auto succ = p.try_wait_for_frames(&frames, waitForFrameTimeout);
             if (!succ) {
-                std::cout << "Failed to get frame, skipping..."  << std::endl;
+                std::cout << "Failed to get frame, skipping..." << std::endl;
                 ready = false;
                 continue;
             }
-            
+
             // this handles the geometry so that the
             // x/y of the depth and color are the same
             try {
@@ -120,7 +119,7 @@ void cameraThread() {
         DEBUG(std::chrono::duration_cast<std::chrono::milliseconds>(finish - start).count()
               << "ms");
 
-        // Camera will only enter a ready state if all cameras have returned valid 
+        // Camera will only enter a ready state if all cameras have returned valid
         // aligned frames
         if (ready) {
             CameraState::get()->ready = 1;

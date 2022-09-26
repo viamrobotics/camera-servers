@@ -40,6 +40,7 @@ using grpc::ServerReaderWriter;
 using grpc::ServerWriter;
 using viam::common::v1::ResourceName;
 using viam::component::camera::v1::CameraService;
+using viam::component::camera::v1::DistortionParameters;
 using viam::component::camera::v1::GetImageRequest;
 using viam::component::camera::v1::GetImageResponse;
 using viam::component::camera::v1::GetPointCloudRequest;
@@ -47,7 +48,6 @@ using viam::component::camera::v1::GetPointCloudResponse;
 using viam::component::camera::v1::GetPropertiesRequest;
 using viam::component::camera::v1::GetPropertiesResponse;
 using viam::component::camera::v1::IntrinsicParameters;
-using viam::component::camera::v1::DistortionParameters;
 using viam::robot::v1::ResourceNamesRequest;
 using viam::robot::v1::ResourceNamesResponse;
 using viam::robot::v1::RobotService;
@@ -266,7 +266,7 @@ void cameraThread(rs2::pipeline p) {
     rs2::align alignment(RS2_STREAM_COLOR);  // align to the color camera's origin
     while (true) {
         auto start = std::chrono::high_resolution_clock::now();
-        auto  output = std::make_shared<CameraOutput>();
+        auto output = std::make_shared<CameraOutput>();
         rs2::frameset frames;
         uint timeout = 1000;
         bool succ = p.try_wait_for_frames(&frames, timeout);
