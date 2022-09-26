@@ -9,8 +9,8 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
-void CameraOutput::add_depth(int bytesPerPixel, float units, int width,
-                             int height, const char* data) {
+void CameraOutput::add_depth(int bytesPerPixel, float units, int width, int height,
+                             const char* data) {
     std::stringbuf buffer;
     std::ostream os(&buffer);
 
@@ -48,8 +48,7 @@ void CameraState::addCamera() {
     _cameras.push_back(0);
 }
 
-void CameraState::setCameraOutput(size_t i,
-                                  std::shared_ptr<CameraOutput> output) {
+void CameraState::setCameraOutput(size_t i, std::shared_ptr<CameraOutput> output) {
     std::lock_guard<std::mutex> lock(_mutex);
     _cameras[i] = output;
 }
@@ -82,8 +81,7 @@ class hello_world_resource : public http_resource {
         }
         os << "</body></html>";
 
-        return std::shared_ptr<http_response>(
-            new string_response(buffer.str(), 200, "text/html"));
+        return std::shared_ptr<http_response>(new string_response(buffer.str(), 200, "text/html"));
     }
 
    private:
@@ -95,8 +93,7 @@ class picture_resource : public camera_resource {
     picture_resource(CameraState* cam) : camera_resource(cam) {}
 
     const std::shared_ptr<http_response> myRender(CameraOutput* mine) {
-        return std::shared_ptr<http_response>(
-            new string_response(mine->ppmdata, 200, "image/ppm"));
+        return std::shared_ptr<http_response>(new string_response(mine->ppmdata, 200, "image/ppm"));
     }
 };
 
@@ -119,15 +116,13 @@ class picture_resource_png : public camera_resource {
             raw_data = raw_data + (mine->ppmdata.size() - len);
 
             int pngLen;
-            auto out = stbi_write_png_to_mem((const unsigned char*)raw_data,
-                                             mine->width * 3, mine->width,
-                                             mine->height, 3, &pngLen);
+            auto out = stbi_write_png_to_mem((const unsigned char*)raw_data, mine->width * 3,
+                                             mine->width, mine->height, 3, &pngLen);
             s = std::string((char*)out, pngLen);
             STBIW_FREE(out);
         }
 
-        return std::shared_ptr<http_response>(
-            new string_response(s, 200, "image/png"));
+        return std::shared_ptr<http_response>(new string_response(s, 200, "image/png"));
     }
 };
 
@@ -137,14 +132,11 @@ class depth_resource_png : public camera_resource {
 
     const std::shared_ptr<http_response> myRender(CameraOutput* mine) {
         std::vector<uchar> chbuf;
-        chbuf.resize(
-            512 *
-            1024);  // just needs to be big enough. prob should be smarter.
+        chbuf.resize(512 * 1024);  // just needs to be big enough. prob should be smarter.
         cv::imencode(".png", mine->depth_cv, chbuf);
         std::string s(chbuf.begin(), chbuf.end());
 
-        return std::shared_ptr<http_response>(
-            new string_response(s, 200, "image/png"));
+        return std::shared_ptr<http_response>(new string_response(s, 200, "image/png"));
     }
 };
 
@@ -175,11 +167,10 @@ class picture_resource_jpg : public camera_resource {
 
         jpeg_out out;
         out.size = 0;
-        auto rv = stbi_write_jpg_to_func(my_jpg_write, &out, mine->width,
-                                         mine->height, 3, raw_data, 20);
+        auto rv =
+            stbi_write_jpg_to_func(my_jpg_write, &out, mine->width, mine->height, 3, raw_data, 20);
         std::string s(out.buf, out.size);
-        return std::shared_ptr<http_response>(
-            new string_response(s, 200, "image/jpg"));
+        return std::shared_ptr<http_response>(new string_response(s, 200, "image/jpg"));
     }
 };
 
@@ -187,8 +178,7 @@ class depth_resource : public camera_resource {
    public:
     depth_resource(CameraState* cam) : camera_resource(cam) {}
     const std::shared_ptr<http_response> myRender(CameraOutput* mine) {
-        return std::shared_ptr<http_response>(
-            new string_response(mine->depth, 200, "binary"));
+        return std::shared_ptr<http_response>(new string_response(mine->depth, 200, "binary"));
     }
 };
 
@@ -198,8 +188,7 @@ class combined_resource : public camera_resource {
     const std::shared_ptr<http_response> myRender(CameraOutput* mine) {
         std::string both = mine->depth + mine->ppmdata;
 
-        return std::shared_ptr<http_response>(
-            new string_response(both, 200, "binary"));
+        return std::shared_ptr<http_response>(new string_response(both, 200, "binary"));
     }
 };
 
@@ -217,8 +206,7 @@ void installWebHandlers(httpserver::webserver* ws) {
     ws->register_resource("/both", new combined_resource(x));
 }
 
-std::string my_write_ppm(const char* pixels, int x, int y,
-                         int bytes_per_pixel) {
+std::string my_write_ppm(const char* pixels, int x, int y, int bytes_per_pixel) {
     std::stringbuf buffer;
     std::ostream os(&buffer);
 

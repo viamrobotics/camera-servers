@@ -13,8 +13,7 @@ class CameraOutput {
    public:
     CameraOutput() {}
 
-    void add_depth(int bytesPerPixel, float units, int width, int height,
-                   const char* data);
+    void add_depth(int bytesPerPixel, float units, int width, int height, const char* data);
     int width;
     int height;
     int depth_width;
@@ -58,8 +57,7 @@ class camera_resource : public httpserver::http_resource {
         return std::stoi(s);
     }
 
-    const std::shared_ptr<httpserver::http_response> render(
-        const httpserver::http_request& r) {
+    const std::shared_ptr<httpserver::http_response> render(const httpserver::http_request& r) {
         _cams->setLastRequest(time(0));
 
         if (!_cams->ready) {
@@ -77,8 +75,7 @@ class camera_resource : public httpserver::http_resource {
         return myRender(mine.get());
     }
 
-    virtual const std::shared_ptr<httpserver::http_response> myRender(
-        CameraOutput* co) = 0;
+    virtual const std::shared_ptr<httpserver::http_response> myRender(CameraOutput* co) = 0;
 
    private:
     CameraState* _cams;

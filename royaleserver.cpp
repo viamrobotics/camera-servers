@@ -119,15 +119,13 @@ int main(int argc, char** argv) {
         CameraManager manager;
 
         // if no argument was given try to open the first connected camera
-        royale::Vector<royale::String> camlist(
-            manager.getConnectedCameraList());
+        royale::Vector<royale::String> camlist(manager.getConnectedCameraList());
         cout << "Detected " << camlist.size() << " camera(s)." << endl;
         if (camlist.empty()) {
             std::cerr << "No suitable camera device detected." << std::endl
                       << "Please make sure that a supported camera is plugged "
                          "in, all drivers are "
-                      << "installed, and you have proper USB permission"
-                      << std::endl;
+                      << "installed, and you have proper USB permission" << std::endl;
             return 1;
         }
 
@@ -145,20 +143,19 @@ int main(int argc, char** argv) {
 
     auto status = cameraDevice->initialize();
     if (status != CameraStatus::SUCCESS) {
-        cerr << "Cannot initialize the camera device, error string : "
-             << getErrorString(status) << endl;
+        cerr << "Cannot initialize the camera device, error string : " << getErrorString(status)
+             << endl;
         return 1;
     }
 
     status = cameraDevice->setUseCase("Low_Noise_Extended");
     if (status != CameraStatus::SUCCESS) {
-        cerr << "Cannot initialize the camera device, error string : "
-             << getErrorString(status) << endl;
+        cerr << "Cannot initialize the camera device, error string : " << getErrorString(status)
+             << endl;
         return 1;
     }
 
-    if (cameraDevice->registerDataListener(&listener) !=
-        CameraStatus::SUCCESS) {
+    if (cameraDevice->registerDataListener(&listener) != CameraStatus::SUCCESS) {
         cerr << "Error registering data listener" << endl;
         return 1;
     }

@@ -6,15 +6,15 @@ endif
 
 LIB_FILES = cameraserver.cpp
 
-default: intelrealserver royaleserver 
+default: intelrealserver intelrealgrpcserver royaleserver 
 
 format: *.h *.cpp
-	clang-format -i --style="{BasedOnStyle: Google, IndentWidth: 4}" *.cpp *.h
+	clang-format -i --style="{BasedOnStyle: Google, IndentWidth: 4, ColumnLimit: 100}" *.cpp *.h
 
 all: default opencv
 
 clean:
-	rm -rf intelrealserver royaleserver opencvserver
+	rm -rf intelrealserver intelrealgrpcserver royaleserver opencvserver
 
 clean-all: clean
 	git clean -fxd
@@ -33,6 +33,7 @@ opencvserver: opencvserver.cpp $(LIB_FILES)
 
 appimages: default
 	cd packaging/appimages && appimage-builder --recipe intelrealserver-`uname -m`.yml
+	cd packaging/appimages && appimage-builder --recipe intelrealgrpcserver-`uname -m`.yml
 	cd packaging/appimages && appimage-builder --recipe royaleserver-`uname -m`.yml
 	mkdir -p packaging/appimages/deploy/
 	mv packaging/appimages/*.AppImage* packaging/appimages/deploy/

@@ -74,18 +74,15 @@ void cameraThread() {
         output->height = frame.rows;
 
         if (frame.type() != 16) {
-            std::cerr << "don't know this type (" << frame.type() << ")"
-                      << type2str(frame.type()) << " please finish"
-                      << std::endl;
+            std::cerr << "don't know this type (" << frame.type() << ")" << type2str(frame.type())
+                      << " please finish" << std::endl;
             exit(-1);
         }
 
-        DEBUG("type: " << frame.type() << " " << type2str(frame.type())
-                       << " w: " << output->width << " h: " << output->height
-                       << " tota: " << frame.total());
+        DEBUG("type: " << frame.type() << " " << type2str(frame.type()) << " w: " << output->width
+                       << " h: " << output->height << " tota: " << frame.total());
 
-        output->ppmdata = my_write_ppm((const char*)frame.data, output->width,
-                                       output->height, 3);
+        output->ppmdata = my_write_ppm((const char*)frame.data, output->width, output->height, 3);
 
         CameraState::get()->setCameraOutput(0, output);
 
