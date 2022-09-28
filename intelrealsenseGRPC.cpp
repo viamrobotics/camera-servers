@@ -102,20 +102,20 @@ class CameraServiceImpl final : public CameraService::Service {
                 cv::imencode(".png", cvConverted, chbuf);
                 std::string s(chbuf.begin(), chbuf.end());
                 response->set_image(s);
-                // [RSDK-683] currently dont support raw 16bit RGBA inputs
+                /* [RSDK-683] currently dont support raw 16bit RGBA inputs
                 } else if (reqMimeType.find("image/vnd.viam.rgba") != std::string::npos) { 
                     response->set_mime_type(reqMimeType);
                     cv::Mat cvConverted(m_rsp->color_height, m_rsp->color_width, CV_16UC4); 
                     cv::cvtColor(output->pic_cv, cvConverted, cv::COLOR_BGR2RGBA, 4); 
                     std::string s(cvConverted.datastart, cvConverted.dataend); 
                     response->set_image(s);
+                  */
             } else {
                 // return jpeg if none specified
                 if (reqMimeType.find("image/jpeg") != std::string::npos) {
                     response->set_mime_type(reqMimeType);
-                } else if (reqMimeType == "") {
-                           // (reqMimeType.find("image/vnd.viam.rgba") != std::string::npos)) {
-                    response->set_mime_type("image/jpeg");
+                } else if ((reqMimeType == "") || (reqMimeType.find("image/vnd.viam.rgba") != std::string::npos)) {
+                    response->set_mime_type("image/jpeg+lazy");
                 } else {
                     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT,
                                         "dont have mime type " + reqMimeType);
