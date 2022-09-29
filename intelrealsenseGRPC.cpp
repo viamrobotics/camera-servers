@@ -299,6 +299,9 @@ void cameraThread(rs2::pipeline p) {
         try {
             output->depth_cv =
                 cv::Mat(depth.get_height(), depth.get_width(), CV_16U, (void*)(depth.get_data()));
+            output->depth_cv.forEach<uint16_t>([](uint16_t &p, const int * position) -> void {
+                p = p * 0.25;
+            });
         } catch (std::exception& e) {
             std::cout << "intelGRPCserver: Exception while constructing matrix "
                          "for depth frame: "
