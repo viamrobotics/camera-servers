@@ -50,7 +50,7 @@ sudo chmod a+rx /usr/local/bin/intelrealgrpcserver
 ### macOS dependency install
 Run `make setupmacos`
 
-### Linux
+### Linux dependency install
 **If on Raspberry Pi (Debian):** `sudo apt install xorg-dev`
 
 #### Installing `librealsense` from source
@@ -76,9 +76,13 @@ make -j 4
 sudo make install
 ```
 
-### If none of that works, try this:
+#### If none of that works, try this:
 
 https://github.com/IntelRealSense/librealsense/blob/master/doc/libuvc_installation.md
+
+### Build the binary
+
+run either `make intelrealserver`, `make intelrealgrpcserver`, or `make royaleserver` depending on which binary you would like to make.
 
 You can then export an AppImage of the binary using
 ```
