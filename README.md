@@ -141,3 +141,65 @@ $ grpcurl -max-msg-sz 10485760 -plaintext -d '{ "name": "color", "mimeType": "im
 $ open output_image.jpeg
 ```
 
+## Adding a GRPC camera as a remote to your robot
+
+### Start the server on robot start up
+
+On app.viam.com, go to Config -> Processes, and put in the following:
+```
+[ 
+  { 
+    "id": "intel", 
+    "log": true, 
+    "name": "/usr/local/bin/intelgrpcserver",
+    "args": [port_number, image_width, image_height] // Put the actual numbers you want here. If the realsense does not support the request height and width it will error and fail to start
+ 
+  } 
+]
+```
+If you just want the defaults, dont include the “args” field. If you dont put in anything, this will set up the GRPC server running on port 8085 of your pi with the default resolution.
+
+### Add the GRPC server as a remote
+
+Then go to Config -> Remote, and add the following 
+```
+[
+ {
+   "name": "intel",
+   "address": "ip-address-of-your-pi:8085", // or whatever port number you set
+   "insecure": true
+ }
+]
+```
+
+This will add the two cameras to your robot. They will have the names `intel:color` and `intel:depth`.
+
+### Create camera to display point clouds
+
+Go to Config -> Components, and add the following camera model, `align_color_depth`. 
+```
+ {
+        "stream": "color",
+        "width_px": 1280, // whatever the actual height and width of your images are
+       "height_px": 720,
+    // you can get intrinsics by calling GetProperties on the intel GRPC camera server, too
+        "intrinsic_parameters": { 
+            "height_px": 720,
+            "width_px": 1280,
+            "ppx": 648.1280,
+            "ppy": 367.736,
+            "fx": 900.538,
+            "fy": 900.818
+        },
+        "color_camera_name": "intel:color",
+        "depth_camera_name": "intel:depth"
+      }
+}
+"depends_on": [
+   "intel:color",
+   "intel:depth"
+]
+```
+ 
+Now in the *Control tab*, you can see both the individual 2D camera streams, as well as the pointcloud camera of the combined color and depth image that you created with `align_color_depth`.
+
