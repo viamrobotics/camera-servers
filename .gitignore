@@ -1,6 +1,5 @@
 intelrealserver
 intelrealgrpcserver
-royaleserver
 opencvserver
 packaging/work/
-rdk-minimal/
+api/

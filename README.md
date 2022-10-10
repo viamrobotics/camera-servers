@@ -12,28 +12,17 @@ sudo chmod a+rx /usr/local/bin/intelrealgrpcserver
 ```
 ### URLs
 
-- Intel Realsense HTTP server x86\_64
-  - http://packages.viam.com/apps/camera-servers/intelrealserver-latest-x86_64.AppImage
-- Intel Realsense HTTP server aarch64
-  - http://packages.viam.com/apps/camera-servers/intelrealserver-latest-aarch64.AppImage
 - Intel Realsense GRPC server x86\_64
   - http://packages.viam.com/apps/camera-servers/intelrealgrpcserver-latest-x86_64.AppImage
 - Intel Realsense GRPC server aarch64
   - http://packages.viam.com/apps/camera-servers/intelrealgrpcserver-latest-aarch64.AppImage
-- PMDTEC Pico Flexx HTTP server x86\_64
-  - http://packages.viam.com/apps/camera-servers/royaleserver-latest-x86_64.AppImage
-- PMDTEC Pico Flexx HTTP server aarch64
-  - http://packages.viam.com/apps/camera-servers/royaleserver-latest-aarch64.AppImage
 
-
-## Building from Source
+## Building GRPC server from Source
 
 ### Dependencies
 * [librealsense](https://github.com/IntelRealSense/librealsense)
   * Needed only for Intel RealSense cameras
   * https://github.com/IntelRealSense/librealsense/blob/master/doc/distribution_linux.md
-* [libroyale](https://pmdtec.com/picofamily/software/)
-  * Needed only for PMDTEC cameras
 * [libopencv](https://opencv.org/releases/)
   * In most apt repos `sudo apt install libopencv-dev`
   * Needed for all servers in order to create depth png endpoint.
@@ -82,7 +71,7 @@ https://github.com/IntelRealSense/librealsense/blob/master/doc/libuvc_installati
 
 ### Build the binary
 
-run either `make intelrealserver`, `make intelrealgrpcserver`, or `make royaleserver` depending on which binary you would like to make.
+run `make intelrealgrpcserver`
 
 You can then export an AppImage of the binary using
 ```
@@ -145,25 +134,8 @@ You will get JSON objects as responses from the servers.  Image and PointClouds 
 You can use the program [jq](https://stedolan.github.io/jq/) to extract the relevant bytes and info you need from the response fields, and then decode them as needed. You can extract and  see the image by doing something like the following:
 
 ```
-$ grpcurl -max-msg-sz 10485760 -plaintext -d '{ "name": "MyCamera", "mimeType": "image/jpeg" }' -protoset <(buf build -o -) my-server-url.local:8085 viam.component.camera.v1.CameraService/GetImage | jq -r ".image" > raw_image.txt
+$ grpcurl -max-msg-sz 10485760 -plaintext -d '{ "name": "MyCamera", "mimeType": "image/jpeg" }' -protoset <(buf build -o -) my-server-url.local:8085 viam.component.camera.v1.CameraService/GetImage | jq -r ".image" | base64 --decode >> output_image.jpeg
 
-$ python decode.py raw_image.txt output.jpeg
-
-$ open output.jpeg
-```
-
-The code for decoding base64 using python:
-```
-# decode.py
-import base64, sys
-infilename = sys.argv[1]
-outfilename = sys.argv[2]
-if infilename == "" or outfilename == "":
-    print("in file or out file cannot be empty")
-    exit(1)
-with open(infilename, 'rb') as file:
-    data = file.read()
-    with open(outfilename, 'wb') as outfile:
-        outfile.write(base64.decodebytes(data))
+$ open output_image.jpeg
 ```
 
