@@ -96,18 +96,22 @@ Make sure you have protobuf and then do `make buf`.
 
 ### Know what address and port the server is running on
 
-e.g. my-server-url.local:8085
+e.g. `my-server-url.local:8085`
+
 and make sure the server is running
 
 ### Install [grpcurl](https://github.com/fullstorydev/grpcurl)
 on macOS: brew install grpcurl
+
 On Linux: you can install the releases from github: https://github.com/fullstorydev/grpcurl/releases
 
 ### Install the [Viam API](https://github.com/viamrobotics/api)
 You need the viam API in order for grpcurl to know what methods are available.
 
+```
 git clone git@github.com:viamrobotics/api.git
 cd api
+```
 
 ### Using GRPCurl to query the camera
 
