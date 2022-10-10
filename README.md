@@ -29,8 +29,6 @@ sudo chmod a+rx /usr/local/bin/intelrealgrpcserver
 ## Building from Source
 
 ### Dependencies
-* [libhttpserver](https://github.com/etr/libhttpserver)
-  * Needed for all camera servers
 * [librealsense](https://github.com/IntelRealSense/librealsense)
   * Needed only for Intel RealSense cameras
   * https://github.com/IntelRealSense/librealsense/blob/master/doc/distribution_linux.md
@@ -39,12 +37,14 @@ sudo chmod a+rx /usr/local/bin/intelrealgrpcserver
 * [libopencv](https://opencv.org/releases/)
   * In most apt repos `sudo apt install libopencv-dev`
   * Needed for all servers in order to create depth png endpoint.
+* [libhttpserver](https://github.com/etr/libhttpserver)
+  * Needed for HTTP camera servers
 * [The Viam API](https://github.com/viamrobotics/api)
-  * Needed for gRPC servers
+  * Needed for gRPC camera servers
 * [openssl](https://www.openssl.org/)
-  * Needed for gRPC servers
+  * Needed for gRPC camera servers
 * [protobuf](https://developers.google.com/protocol-buffers/docs/downloads)
-  * Needed for gRPC servers
+  * Needed for gRPC camera servers
   * can try `make bufsetup` to install dependencies.
 
 ### macOS dependency install
