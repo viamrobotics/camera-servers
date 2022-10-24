@@ -24,12 +24,12 @@ buf: bufsetup
 	PATH="${PATH}:`pwd`/grpc/bin" buf generate --template ./grpc/buf.google.gen.yaml buf.build/googleapis/googleapis
 
 bufsetup:
+	GOBIN=`pwd`/grpc/bin go install github.com/bufbuild/buf/cmd/buf@v1.4.0
 	ln -sf `which grpc_cpp_plugin` ./grpc/bin/protoc-gen-grpc-cpp
 	pkg-config openssl || export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:`find \`which brew > /dev/null && brew --prefix\` -name openssl.pc | head -n1 | xargs dirname`
 
 bufinstall:
 	sudo apt-get install -y protobuf-compiler-grpc libgrpc-dev libgrpc++-dev || brew install grpc openssl --quiet
-	GOBIN=`pwd`/grpc/bin go install github.com/bufbuild/buf/cmd/buf@v1.4.0
 
 intelrealgrpcserver: intelrealsenseGRPC.cpp $(LIB_FILES) $(SOURCES)
 	g++ -g -std=c++17 intelrealsenseGRPC.cpp $(LIB_FILES) `pkg-config --cflags --libs realsense2 libhttpserver opencv4` $(SOURCES) -I$(GRPCDIR) $(GRPCFLAGS) -o intelrealgrpcserver
