@@ -24,7 +24,7 @@ buf: bufsetup
 	PATH="${PATH}:`pwd`/grpc/bin" buf generate --template ./grpc/buf.google.gen.yaml buf.build/googleapis/googleapis
 
 bufsetup:
-	ln -sf `which grpc_cpp_plugin` grpc/bin/protoc-gen-grpc-cpp
+	ln -sf `which grpc_cpp_plugin` ./grpc/bin/protoc-gen-grpc-cpp
 	pkg-config openssl || export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:`find \`which brew > /dev/null && brew --prefix\` -name openssl.pc | head -n1 | xargs dirname`
 
 bufinstall:
