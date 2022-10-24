@@ -22,7 +22,7 @@ sudo chmod a+rx /usr/local/bin/intelrealgrpcserver
 ### Dependencies
 * [librealsense](https://github.com/IntelRealSense/librealsense)
   * Needed only for Intel RealSense cameras
-  * https://github.com/IntelRealSense/librealsense/blob/master/doc/distribution_linux.md
+  * [Installation for Linux](https://github.com/IntelRealSense/librealsense/blob/master/doc/distribution_linux.md)
 * [libopencv](https://opencv.org/releases/)
   * In most apt repos `sudo apt install libopencv-dev`
   * Needed for all servers in order to create depth png endpoint.
@@ -40,7 +40,12 @@ sudo chmod a+rx /usr/local/bin/intelrealgrpcserver
 Run `make setupmacos`
 
 ### Linux dependency install
-**If on Raspberry Pi (Debian):** `sudo apt install xorg-dev`
+**If on Raspberry Pi (Debian):** 
+
+```
+sudo apt install xorg-dev
+sudo apt install libopencv-dev
+```
 
 #### Installing `librealsense` from source
 ```bash
