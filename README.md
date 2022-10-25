@@ -15,6 +15,10 @@ For MacOS, you can use our homebrew formula from the Viam tap:
 ```
 brew install viamrobotics/brews/intel-real-grpc-server
 ```
+if you would like to use brew with Linux, the formula for openCV on Linux might not work out of the box, and might require an installation from source
+```
+brew install -s opencv
+```
 
 ### URLs
 
