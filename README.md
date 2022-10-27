@@ -11,7 +11,7 @@ sudo curl -o /usr/local/bin/intelrealgrpcserver http://packages.viam.com/apps/ca
 sudo chmod a+rx /usr/local/bin/intelrealgrpcserver
 ```
 
-For MacOS, you can use our homebrew formula from the Viam tap:
+For MacOS (M1 macs), you can use our homebrew formula from the Viam tap:
 ```
 brew install viamrobotics/brews/intel-real-grpc-server
 ```
