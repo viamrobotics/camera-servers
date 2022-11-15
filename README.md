@@ -22,12 +22,24 @@ brew install -s opencv
 
 ### URLs
 
-- Intel Realsense GRPC server x86\_64
+- Intel Realsense gRPC server x86\_64
   - http://packages.viam.com/apps/camera-servers/intelrealgrpcserver-latest-x86_64.AppImage
-- Intel Realsense GRPC server aarch64
+- Intel Realsense gRPC server aarch64
   - http://packages.viam.com/apps/camera-servers/intelrealgrpcserver-latest-aarch64.AppImage
 
-## Building GRPC server from Source
+### Troubleshooting
+
+If you get an error like "failed to set power state", or "Permission denied", you may need to install the udev rules for when the USB plugs in. 
+
+```
+$ wget https://raw.githubusercontent.com/IntelRealSense/librealsense/7a7c2bcfbc03d45154ad63fa76b221b2bb9d228f/config/99-realsense-libusb.rules
+$ sudo cp 99-realsense-libusb.rules /etc/udev/rules.d/ 
+$ sudo udevadm control --reload-rules && udevadm trigger
+```
+
+You can also look at the official RealSense troubleshooting guide [here](https://github.com/IntelRealSense/librealsense/wiki/Troubleshooting-Q%26A#q-i-ran-the-udev-rules-script-but-linux-still-get-permission-denied).
+ 
+## Building gRPC server from Source
 
 ### Dependencies
 * [librealsense](https://github.com/IntelRealSense/librealsense)
@@ -92,9 +104,9 @@ You can then export an AppImage of the binary using
 ```
 cd packaging/appimages && appimage-builder --recipe mycameraserver-`uname -m`.yml
 ```
-## Query a VIAM GRPC camera server
+## Query a VIAM gRPC camera server
 
-If you have a GRPC camera server running and would like to directly query the camera, here are the instructions of how to do so.
+If you have a gRPC camera server running and would like to directly query the camera, here are the instructions of how to do so.
 
 Make sure you have protobuf and then do `make buf`. 
 
@@ -117,9 +129,9 @@ git clone git@github.com:viamrobotics/api.git
 cd api
 ```
 
-### Using GRPCurl to query the camera
+### Using gRPCurl to query the camera
 
-You can use grpcurl like curl, but for GRPC servers, rather than HTTP servers
+You can use grpcurl like curl, but for gRPC servers, rather than HTTP servers
 
 The available VIAM camera methods are 
 - viam.robot.v1.RobotService/ResourceNames
@@ -156,7 +168,7 @@ $ grpcurl -max-msg-sz 10485760 -plaintext -d '{ "name": "color", "mimeType": "im
 $ open output_image.jpeg
 ```
 
-## Adding a GRPC camera as a remote to your robot
+## Adding a gRPC camera as a remote to your robot
 
 ### Start the server on robot start up
 
@@ -166,15 +178,15 @@ On app.viam.com, go to Config -> Processes, and put in the following:
   { 
     "id": "intel", 
     "log": true, 
-    "name": "/usr/local/bin/intelgrpcserver",
+    "name": "/usr/local/bin/intelrealgrpcserver",
     "args": [port_number, image_width, image_height] // Put the actual numbers you want here. If the realsense does not support the request height and width it will error and fail to start
  
   } 
 ]
 ```
-If you just want the defaults, dont include the “args” field. If you dont put in anything, this will set up the GRPC server running on port 8085 of your pi with the default resolution.
+If you just want the defaults, dont include the “args” field. If you dont put in anything, this will set up the gRPC server running on port 8085 of your pi with the default resolution.
 
-### Add the GRPC server as a remote
+### Add the gRPC server as a remote
 
 Then go to Config -> Remote, and add the following 
 ```
@@ -197,7 +209,7 @@ Go to Config -> Components, and add the following camera model, `align_color_dep
         "stream": "color",
         "width_px": 1280, // whatever the actual height and width of your images are
        "height_px": 720,
-    // you can get intrinsics by calling GetProperties on the intel GRPC camera server, too
+    // you can get intrinsics by calling GetProperties on the intel gRPC camera server, too
         "intrinsic_parameters": { 
             "height_px": 720,
             "width_px": 1280,
