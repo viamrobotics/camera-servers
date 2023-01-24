@@ -16,7 +16,7 @@ auto waitForFrameTimeout = 1000;
 
 void cameraThread() {
     rs2::context ctx;
-
+a
     std::vector<rs2::pipeline> pipelines;
 
     for (auto&& dev : ctx.query_devices()) {
