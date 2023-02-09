@@ -15,10 +15,6 @@ For MacOS (M1 macs), you can use our homebrew formula from the Viam tap:
 ```
 brew install viamrobotics/brews/intel-real-grpc-server
 ```
-if you would like to use brew with Linux, the formula for openCV on Linux might not work out of the box, and might require an installation from source
-```
-brew install -s opencv
-```
 
 ### URLs
 
@@ -45,18 +41,12 @@ You can also look at the official RealSense troubleshooting guide [here](https:/
 * [librealsense](https://github.com/IntelRealSense/librealsense)
   * Needed only for Intel RealSense cameras
   * [Installation for Linux](https://github.com/IntelRealSense/librealsense/blob/master/doc/distribution_linux.md)
-* [libopencv](https://opencv.org/releases/)
-  * In most apt repos `sudo apt install libopencv-dev`
-  * Needed for all servers in order to create depth png endpoint.
-* [libhttpserver](https://github.com/etr/libhttpserver)
-  * Needed for HTTP camera servers
+* [libjpegturbo](https://github.com/libjpeg-turbo/libjpeg-turbo)
+  * Needed for JPEG compression.
+  * can try `make setup`.
 * [The Viam API](https://github.com/viamrobotics/api)
-  * Needed for gRPC camera servers
 * [openssl](https://www.openssl.org/)
-  * Needed for gRPC camera servers
 * [protobuf](https://developers.google.com/protocol-buffers/docs/downloads)
-  * Needed for gRPC camera servers
-  * can try `make bufsetup` to install dependencies.
 
 ### macOS dependency install
 Run `make setupmacos`
@@ -66,7 +56,6 @@ Run `make setupmacos`
 
 ```
 sudo apt install xorg-dev
-sudo apt install libopencv-dev
 ```
 
 #### Installing `librealsense` from source
@@ -80,18 +69,6 @@ make -j 4
 sudo make install
 ```
     
-#### Installing `libhttpserver` from source
-```bash
-sudo apt install libmicrohttpd-dev libtool
-git clone git@github.com:etr/libhttpserver.git
-cd libhttpserver
-./bootstrap
-mkdir build && cd build
-../configure
-make -j 4
-sudo make install
-```
-
 #### If none of that works, try this:
 
 https://github.com/IntelRealSense/librealsense/blob/master/doc/libuvc_installation.md
