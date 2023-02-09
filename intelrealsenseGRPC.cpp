@@ -96,7 +96,6 @@ class CameraServiceImpl final : public CameraService::Service {
                                                                        // catch "Lazy" MIME types
                 response->set_mime_type(reqMimeType);
                 std::vector<uchar> chbuf;
-                chbuf.resize(5 * 1024 * 1024);
                 cv::Mat cvConverted(m_rsp->color_height, m_rsp->color_width, CV_8UC3);
                 cv::cvtColor(output->pic_cv, cvConverted, cv::COLOR_BGR2RGB);
                 cv::imencode(".png", cvConverted, chbuf);
@@ -122,7 +121,6 @@ class CameraServiceImpl final : public CameraService::Service {
                                         "dont have mime type " + reqMimeType);
                 }
                 std::vector<uchar> chbuf;
-                chbuf.resize(5 * 1024 * 1024);
                 cv::Mat cvConverted(m_rsp->color_height, m_rsp->color_width, CV_8UC3);
                 cv::cvtColor(output->pic_cv, cvConverted, cv::COLOR_BGR2RGB);
                 cv::imencode(".jpg", cvConverted, chbuf);
@@ -134,7 +132,6 @@ class CameraServiceImpl final : public CameraService::Service {
             if (reqMimeType.find("image/jpeg") != std::string::npos) {
                 response->set_mime_type(reqMimeType);
                 std::vector<uchar> chbuf;
-                chbuf.resize(5 * 1024 * 1024);
                 cv::imencode(".jpg", output->depth_cv, chbuf);
                 std::string s(chbuf.begin(), chbuf.end());
                 response->set_image(s);
@@ -158,7 +155,6 @@ class CameraServiceImpl final : public CameraService::Service {
                                         "dont have mime type " + reqMimeType);
                 }
                 std::vector<uchar> chbuf;
-                chbuf.resize(5 * 1024 * 1024);
                 cv::imencode(".png", output->depth_cv, chbuf);
                 std::string s(chbuf.begin(), chbuf.end());
                 response->set_image(s);

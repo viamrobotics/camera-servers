@@ -33,5 +33,5 @@ bufinstall:
 	sudo apt-get install -y protobuf-compiler-grpc libgrpc-dev libgrpc++-dev || brew install grpc openssl --quiet
 
 intelrealgrpcserver: intelrealsenseGRPC.cpp $(LIB_FILES) $(SOURCES)
-	g++ -g -std=c++17 intelrealsenseGRPC.cpp $(LIB_FILES) `pkg-config --cflags --libs realsense2 libhttpserver opencv4` $(SOURCES) -I$(GRPCDIR) $(GRPCFLAGS) -o intelrealgrpcserver
+	g++ -O3 -std=c++17 intelrealsenseGRPC.cpp $(LIB_FILES) `pkg-config --cflags --libs realsense2 libhttpserver opencv4` $(SOURCES) -I$(GRPCDIR) $(GRPCFLAGS) -o intelrealgrpcserver
 
