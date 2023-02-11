@@ -30,7 +30,7 @@ SOURCES += $(GRPC_DIR)/common/v1/common.grpc.pb.cc $(GRPC_DIR)/common/v1/common.
 SOURCES += $(GRPC_DIR)/component/camera/v1/camera.grpc.pb.cc $(GRPC_DIR)/component/camera/v1/camera.pb.cc
 SOURCES += $(GRPC_DIR)/google/api/annotations.pb.cc $(GRPC_DIR)/google/api/httpbody.pb.cc
 SOURCES += $(GRPC_DIR)/google/api/http.pb.cc
-SOURCES += fpng.cpp
+SOURCES += third_party/fpng.cpp
 
 default: intelrealgrpcserver-release-opt
 

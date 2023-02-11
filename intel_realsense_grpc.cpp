@@ -16,7 +16,7 @@
 #include "common/v1/common.pb.h"
 #include "component/camera/v1/camera.grpc.pb.h"
 #include "component/camera/v1/camera.pb.h"
-#include "fpng.h"
+#include "third_party/fpng.h"
 #include "robot/v1/robot.grpc.pb.h"
 #include "robot/v1/robot.pb.h"
 
