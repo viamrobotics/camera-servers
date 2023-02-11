@@ -16,9 +16,9 @@
 #include "common/v1/common.pb.h"
 #include "component/camera/v1/camera.grpc.pb.h"
 #include "component/camera/v1/camera.pb.h"
-#include "third_party/fpng.h"
 #include "robot/v1/robot.grpc.pb.h"
 #include "robot/v1/robot.pb.h"
+#include "third_party/fpng.h"
 
 using namespace std;
 using grpc::Server;
@@ -73,7 +73,7 @@ tuple<vector<uint8_t>, bool> encodePNG(const uint8_t* data, const int width, con
 
     vector<uint8_t> encoded;
     if (!fpng::fpng_encode_image_to_memory(data, width, height, 3, encoded)) {
-        cerr << "[GetImage]  failed to encode PNG\n";
+        cerr << "[GetImage]  failed to encode PNG" << endl;
         return {encoded, false};
     }
 
@@ -108,7 +108,7 @@ tuple<unsigned char*, long unsigned int, bool> encodeJPEG(const unsigned char* d
     long unsigned int encodedSize = 0;
     tjhandle handle = tjInitCompress();
     if (handle == nullptr) {
-        cerr << "[GetImage]  failed to init JPEG compressor\n";
+        cerr << "[GetImage]  failed to init JPEG compressor" << endl;
         return {encoded, encodedSize, false};
     }
     tjCompress2(handle, data, width, 0, height, TJPF_RGB, &encoded, &encodedSize, TJSAMP_420, 75,
@@ -267,7 +267,7 @@ void frameLoop(rs2::pipeline pipeline, AtomicFrameSet& frameSet, promise<void>& 
         bool succ = pipeline.try_wait_for_frames(&frames, timeoutMillis);
         if (!succ) {
             cerr << "[frameLoop] could not get frames from realsense after " << timeoutMillis
-                 << "ms\n";
+                 << "ms" << endl;
             this_thread::sleep_for(failureWait);
             continue;
         }
@@ -284,7 +284,7 @@ void frameLoop(rs2::pipeline pipeline, AtomicFrameSet& frameSet, promise<void>& 
             try {
                 frames = FRAME_ALIGNMENT.process(frames);
             } catch (const exception& e) {
-                cerr << "[frameLoop] exception while aligning images: " << e.what() << "\n";
+                cerr << "[frameLoop] exception while aligning images: " << e.what() << endl;
                 this_thread::sleep_for(failureWait);
                 continue;
             }
@@ -409,11 +409,12 @@ const PipelineWithProperties startPipeline(const int colorWidth, const int color
 int main(const int argc, const char* argv[]) {
     fpng::fpng_init();
 
-    cout << "Intel RealSense gRPC server\n";
+    cout << "Intel RealSense gRPC server" << endl;
     if (argc == 2 && string("--help").compare(string(argv[1])) == 0) {
         cout << "usage: intelrealgrpcserver [port_number] [color_width] [color_height] "
                 "[depth_width] [depth_height]"
-                "[--disable-depth] [--disable-color]\n";
+                "[--disable-depth] [--disable-color]"
+             << endl;
         return 0;
     }
     string port = "8085";
@@ -432,7 +433,7 @@ int main(const int argc, const char* argv[]) {
         char* endParse;
         auto parsed = strtol(argv[pos], &endParse, 10);
         if (argv[pos] == endParse) {
-            cerr << "failed to parse " << name << " \"" << argv[pos] << "\"\n";
+            cerr << "failed to parse " << name << " \"" << argv[pos] << "\"" << endl;
             return {0, true};
         }
         return {parsed, false};
@@ -457,10 +458,10 @@ int main(const int argc, const char* argv[]) {
     }
 
     if (colorWidth == 0 || colorHeight == 0) {
-        cout << "note: will pick any suitable color_width and color_height\n";
+        cout << "note: will pick any suitable color_width and color_height" << endl;
     }
     if (depthWidth == 0 || depthHeight == 0) {
-        cout << "note: will pick any suitable depth_width and depth_height\n";
+        cout << "note: will pick any suitable depth_width and depth_height" << endl;
     }
 
     bool disableDepth = false;
@@ -477,7 +478,7 @@ int main(const int argc, const char* argv[]) {
     }
 
     if (disableColor && disableDepth) {
-        cerr << "cannot disable both color and depth\n";
+        cerr << "cannot disable both color and depth" << endl;
         return 1;
     }
 
@@ -486,7 +487,7 @@ int main(const int argc, const char* argv[]) {
         pipeAndProps = startPipeline(colorWidth, colorHeight, depthWidth, depthHeight, disableDepth,
                                      disableColor);
     } catch (const exception& e) {
-        cout << "caught exception: \"" << e.what() << "\"\n";
+        cout << "caught exception: \"" << e.what() << "\"" << endl;
         return 1;
     }
 
@@ -496,23 +497,23 @@ int main(const int argc, const char* argv[]) {
         cout << "color_width:    " << pipeAndProps.properties.color.width << "\n";
         cout << "color_height:   " << pipeAndProps.properties.color.height << "\n";
     }
-    cout << "depth_enabled:  " << !disableDepth << "\n";
+    cout << "depth_enabled:  " << !disableDepth << endl;
     if (!disableDepth) {
         auto alignedText = "";
         if (!disableColor) {
             alignedText = " (aligned to color)";
         }
         cout << "depth_width:    " << pipeAndProps.properties.depth.width << alignedText << "\n";
-        cout << "depth_height:   " << pipeAndProps.properties.depth.height << alignedText << "\n";
+        cout << "depth_height:   " << pipeAndProps.properties.depth.height << alignedText << endl;
     }
 
     AtomicFrameSet latestFrames;
     promise<void> ready;
     thread cameraThread(frameLoop, pipeAndProps.pipeline, ref(latestFrames), ref(ready),
                         disableColor, disableDepth);
-    cout << "waiting for camera frame loop thread to be ready...";
+    cout << "waiting for camera frame loop thread to be ready..." << flush;
     ready.get_future().wait();
-    cout << " ready!\n";
+    cout << " ready!" << endl;
 
     RobotServiceImpl robotService;
     CameraServiceImpl cameraService(pipeAndProps.properties, latestFrames, disableColor,
@@ -524,7 +525,7 @@ int main(const int argc, const char* argv[]) {
     builder.RegisterService(&cameraService);
     unique_ptr<Server> server(builder.BuildAndStart());
 
-    cout << "listening on " << address << "\n";
+    cout << "listening on " << address << endl;
     server->Wait();
     return 0;
 }

@@ -34,8 +34,8 @@ SOURCES += third_party/fpng.cpp
 
 default: intelrealgrpcserver-release-opt
 
-format: *.h *.cpp
-	clang-format -i --style="{BasedOnStyle: Google, IndentWidth: 4, ColumnLimit: 100}" *.h *.cpp
+format: *.cpp
+	clang-format -i --style="{BasedOnStyle: Google, IndentWidth: 4, ColumnLimit: 100}" *.cpp
 
 all: default
 
