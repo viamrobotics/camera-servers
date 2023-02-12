@@ -10,7 +10,7 @@ ifeq ($(UNAME), Darwin)
    PKG_CONFIG_PATH_EXTRA=$(PKG_CONFIG_PATH):/usr/local/lib/pkgconfig:$(shell find $(shell which brew > /dev/null && brew --prefix) -name openssl.pc | head -n1 | xargs dirname)
 endif
 
-LIB_FLAGS = $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH_EXTRA) pkg-config --cflags grpc realsense2 --libs protobuf grpc++ libturbojpeg realsense2)
+LIB_FLAGS = $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH_EXTRA) pkg-config --cflags grpc++ realsense2 --libs protobuf grpc++ libturbojpeg realsense2)
 GCC_FLAGS = -pthread -Wl,-ldl
 
 GRPC_DIR = ./
@@ -46,8 +46,7 @@ clean-all: clean
 	git clean -fxd
 
 setup:
-	# TODO(erd): + macos turbo and realsense
-	sudo apt install -y libturbojpeg-dev
+	sudo apt install -y libturbojpeg-dev || brew install jpeg-turbo
 
 $(SOURCES): $(TOOL_BIN)/buf $(TOOL_BIN)/protoc-gen-grpc-cpp
 	PATH=$(PATH_WITH_TOOLS) buf generate --template ./grpc/buf.gen.yaml buf.build/viamrobotics/api

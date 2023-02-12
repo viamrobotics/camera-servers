@@ -38,9 +38,11 @@ You can also look at the official RealSense troubleshooting guide [here](https:/
 ## Building gRPC server from Source
 
 ### Dependencies
-* [librealsense](https://github.com/IntelRealSense/librealsense)
-  * Needed only for Intel RealSense cameras
-  * [Installation for Linux](https://github.com/IntelRealSense/librealsense/blob/master/doc/distribution_linux.md)
+* [librealsense](https://github.com/IntelRealSense/librealsense) (tested on v2.53.1)
+  * https://github.com/IntelRealSense/librealsense#download-and-install
+  * macOS Troubleshooting
+    * We suggest using the following cmake replacement command `cmake .. -DBUILD_EXAMPLES=false -DBUILD_WITH_OPENMP=false -DHWM_OVER_XU=false -DBUILD_TOOLS=false`.
+    * If you get a `-latomic` linking error, you can try removing `-latomic` references from `CMake/unix_config.cmake`
 * [libjpegturbo](https://github.com/libjpeg-turbo/libjpeg-turbo)
   * Needed for JPEG compression.
   * can try `make setup`.
@@ -48,15 +50,8 @@ You can also look at the official RealSense troubleshooting guide [here](https:/
 * [openssl](https://www.openssl.org/)
 * [protobuf](https://developers.google.com/protocol-buffers/docs/downloads)
 
-### macOS dependency install
-Run `make setupmacos`
-
-### Linux dependency install
-**If on Raspberry Pi (Debian):** 
-
-```
-sudo apt install xorg-dev
-```
+### Dependency install
+Run `make setup`
 
 #### Installing `librealsense` from source
 ```bash
@@ -85,7 +80,7 @@ cd packaging/appimages && appimage-builder --recipe mycameraserver-`uname -m`.ym
 
 If you have a gRPC camera server running and would like to directly query the camera, here are the instructions of how to do so.
 
-Make sure you have protobuf and then do `make buf`. 
+Make sure you have `buf` installed.
 
 ### Know what address and port the server is running on
 
@@ -112,35 +107,31 @@ You can use grpcurl like curl, but for gRPC servers, rather than HTTP servers
 
 The available VIAM camera methods are 
 - viam.robot.v1.RobotService/ResourceNames
-- viam.component.camera.v1.CameraService/GetPointCloud
 - viam.component.camera.v1.CameraService/GetImage
 - viam.component.camera.v1.CameraService/GetProperties
 
 From within the API directory, you can run commands like
 
 ```
-$ grpcurl -plaintext -protoset <(buf build -o -) my-server-url.local:8085 viam.robot.v1.RobotService/ResourceNames
+$ grpcurl -plaintext -protoset -protoset <(buf build -o - buf.build/viamrobotics/api) my-server-url.local:8085 viam.robot.v1.RobotService/ResourceNames
 
 
-$ grpcurl -plaintext -d '{ "name": "MyCamera" }' -protoset <(buf build -o -) my-server-url.local:8085 viam.component.camera.v1.CameraService/GetProperties
+$ grpcurl -plaintext -d '{ "name": "MyCamera" }' -protoset -protoset <(buf build -o - buf.build/viamrobotics/api) my-server-url.local:8085 viam.component.camera.v1.CameraService/GetProperties
 
 
-$ grpcurl -max-msg-sz 10485760 -plaintext -d '{ "name": "MyCamera", "mimeType": "image/png" }' -protoset <(buf build -o -) my-server-url.local:8085 viam.component.camera.v1.CameraService/GetImage
-
-
-$ grpcurl -max-msg-sz 20485760 -plaintext -d '{ "name": "MyCamera" }' -protoset <(buf build -o -) my-server-url.local:8085 viam.component.camera.v1.CameraService/GetPointCloud
+$ grpcurl -max-msg-sz 10485760 -plaintext -d '{ "name": "MyCamera", "mimeType": "image/png" }' -protoset -protoset <(buf build -o - buf.build/viamrobotics/api) my-server-url.local:8085 viam.component.camera.v1.CameraService/GetImage
 ```
 
 ### Handling the responses from the servers
 
-You will get JSON objects as responses from the servers.  Image and PointClouds requests will return the bytes encoded in base64. 
+You will get JSON objects as responses from the servers.  Image requests will return the bytes encoded in base64. 
 
 You can use the program [jq](https://stedolan.github.io/jq/) to extract the relevant bytes and info you need from the response fields, and then decode them as needed. You can extract and  see the image by doing something like the following:
 
 ```
 $ cd api
 
-$ grpcurl -max-msg-sz 10485760 -plaintext -d '{ "name": "color", "mimeType": "image/jpeg" }' -protoset <(buf build -o -) my-server-url.local:8085 viam.component.camera.v1.CameraService/GetImage | jq -r ".image" | base64 --decode >> output_image.jpeg
+$ grpcurl -max-msg-sz 10485760 -plaintext -d '{ "name": "color", "mimeType": "image/jpeg" }' -protoset -protoset <(buf build -o - buf.build/viamrobotics/api) my-server-url.local:8085 viam.component.camera.v1.CameraService/GetImage | jq -r ".image" | base64 --decode >> output_image.jpeg
 
 $ open output_image.jpeg
 ```
@@ -156,16 +147,18 @@ On app.viam.com, go to Config -> Processes, and put in the following:
     "id": "intel", 
     "log": true, 
     "name": "/usr/local/bin/intelrealgrpcserver",
-    "args": [port_number, image_width, image_height] // Put the actual numbers you want here. If the realsense does not support the request height and width it will error and fail to start
+    "args": [port_number, color_width, color_height, depth_width, depth_height] // Put the actual numbers you want here. If the realsense does not support the requested height and width it will error and fail to start
  
   } 
 ]
 ```
 If you just want the defaults, dont include the “args” field. If you dont put in anything, this will set up the gRPC server running on port 8085 of your pi with the default resolution.
 
+Additionally, after `depth_height` you can use `--disable-depth` `--disable-color` to disable streaming of depth or color.
+
 ### Add the gRPC server as a remote
 
-Then go to Config -> Remote, and add the following 
+Then go to Config -> Remotes, and add the following 
 ```
 [
  {
