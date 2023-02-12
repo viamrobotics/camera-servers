@@ -2,3 +2,4 @@ intelrealgrpcserver
 packaging/work/
 api/
 bin/
+.DS_Store
