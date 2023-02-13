@@ -25,6 +25,10 @@ GRPC_DIR=./grpc/cpp/gen
 endif
 endif
 
+ifeq ($(shell arch), x86_64)
+   GCC_FLAGS += -mpclmul -msse2 -msse4.2
+endif
+
 SOURCES = $(GRPC_DIR)/robot/v1/robot.grpc.pb.cc $(GRPC_DIR)/robot/v1/robot.pb.cc
 SOURCES += $(GRPC_DIR)/common/v1/common.grpc.pb.cc $(GRPC_DIR)/common/v1/common.pb.cc
 SOURCES += $(GRPC_DIR)/component/camera/v1/camera.grpc.pb.cc $(GRPC_DIR)/component/camera/v1/camera.pb.cc
