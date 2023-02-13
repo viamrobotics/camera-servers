@@ -7,11 +7,19 @@ PATH_WITH_TOOLS="`pwd`/$(TOOL_BIN):${PATH}"
 UNAME := $(shell uname)
 
 ifeq ($(UNAME), Darwin)
+ifneq ($(shell which brew), )
    PKG_CONFIG_PATH_EXTRA=$(PKG_CONFIG_PATH):/usr/local/lib/pkgconfig:$(shell find $(shell which brew > /dev/null && brew --prefix) -name openssl.pc | head -n1 | xargs dirname)
 endif
+endif
 
-LIB_FLAGS = $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH_EXTRA) pkg-config --cflags grpc++ realsense2 --libs protobuf grpc++ libturbojpeg realsense2)
+LIB_FLAGS = $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH):$(PKG_CONFIG_PATH_EXTRA) pkg-config --cflags grpc++ realsense2 --libs protobuf grpc++ libturbojpeg realsense2)
 GCC_FLAGS = -pthread -Wl,-ldl
+
+ifeq ($(UNAME), Darwin)
+	# There's a strange bug in the realsense pc file that adds this when it's not necessary at all
+	# when brew is in use. This may break something in the future.
+   LIB_FLAGS := $(LIB_FLAGS:-L/usr/local/lib/x86_64-linux-gnu=)
+endif
 
 GRPC_DIR = ./
 
@@ -29,12 +37,12 @@ ifeq ($(shell arch), x86_64)
    GCC_FLAGS += -mpclmul -msse2 -msse4.2
 endif
 
-SOURCES = $(GRPC_DIR)/robot/v1/robot.grpc.pb.cc $(GRPC_DIR)/robot/v1/robot.pb.cc
-SOURCES += $(GRPC_DIR)/common/v1/common.grpc.pb.cc $(GRPC_DIR)/common/v1/common.pb.cc
-SOURCES += $(GRPC_DIR)/component/camera/v1/camera.grpc.pb.cc $(GRPC_DIR)/component/camera/v1/camera.pb.cc
-SOURCES += $(GRPC_DIR)/google/api/annotations.pb.cc $(GRPC_DIR)/google/api/httpbody.pb.cc
-SOURCES += $(GRPC_DIR)/google/api/http.pb.cc
-SOURCES += third_party/fpng.cpp
+GEN_SOURCES = $(GRPC_DIR)/robot/v1/robot.grpc.pb.cc $(GRPC_DIR)/robot/v1/robot.pb.cc
+GEN_SOURCES += $(GRPC_DIR)/common/v1/common.grpc.pb.cc $(GRPC_DIR)/common/v1/common.pb.cc
+GEN_SOURCES += $(GRPC_DIR)/component/camera/v1/camera.grpc.pb.cc $(GRPC_DIR)/component/camera/v1/camera.pb.cc
+GEN_SOURCES += $(GRPC_DIR)/google/api/annotations.pb.cc $(GRPC_DIR)/google/api/httpbody.pb.cc
+GEN_SOURCES += $(GRPC_DIR)/google/api/http.pb.cc
+THIRD_PARTY_SOURCES = third_party/fpng.cpp
 
 default: intelrealgrpcserver-release-opt
 
@@ -50,9 +58,9 @@ clean-all: clean
 	git clean -fxd
 
 setup:
-	sudo apt install -y libturbojpeg-dev || brew install jpeg-turbo
+	sudo apt install -y libturbojpeg-dev protobuf-compiler-grpc libgrpc-dev libgrpc++-dev || brew install jpeg-turbo grpc openssl --quiet
 
-$(SOURCES): $(TOOL_BIN)/buf $(TOOL_BIN)/protoc-gen-grpc-cpp
+$(GEN_SOURCES): $(TOOL_BIN)/buf $(TOOL_BIN)/protoc-gen-grpc-cpp
 	PATH=$(PATH_WITH_TOOLS) buf generate --template ./grpc/buf.gen.yaml buf.build/viamrobotics/api
 	PATH=$(PATH_WITH_TOOLS) buf generate --template ./grpc/buf.google.gen.yaml buf.build/googleapis/googleapis
 
@@ -61,12 +69,11 @@ $(TOOL_BIN)/buf:
 	GOBIN=`pwd`/$(TOOL_BIN) go install github.com/bufbuild/buf/cmd/buf@v1.13.1
 
 $(TOOL_BIN)/protoc-gen-grpc-cpp:
-	sudo apt-get install -y protobuf-compiler-grpc libgrpc-dev libgrpc++-dev || brew install grpc openssl --quiet
 	ln -sf `which grpc_cpp_plugin` $(TOOL_BIN)/protoc-gen-grpc-cpp
 
-SERVER_TARGETS = intel_realsense_grpc.cpp $(SOURCES)
+SERVER_TARGETS = $(THIRD_PARTY_SOURCES) $(GEN_SOURCES) intel_realsense_grpc.cpp
 CPP_COMPILER = g++
-CPP_FLAGS = -std=c++17 -o intelrealgrpcserver -I$(GRPC_DIR) intel_realsense_grpc.cpp $(SOURCES) $(LIB_FLAGS) $(GCC_FLAGS)
+CPP_FLAGS = -std=c++17 -o intelrealgrpcserver -I$(GRPC_DIR) intel_realsense_grpc.cpp $(THIRD_PARTY_SOURCES) $(GEN_SOURCES) $(LIB_FLAGS) $(GCC_FLAGS)
 
 intelrealgrpcserver: $(SERVER_TARGETS)
 	$(CPP_COMPILER) $(CPP_FLAGS_EXTRA) $(CPP_FLAGS)
