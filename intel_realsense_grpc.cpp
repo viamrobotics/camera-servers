@@ -18,6 +18,7 @@
 #include "component/camera/v1/camera.pb.h"
 #include "robot/v1/robot.grpc.pb.h"
 #include "robot/v1/robot.pb.h"
+#include "third_party/lodepng.h"
 #include "third_party/fpng.h"
 
 using namespace std;
@@ -50,6 +51,7 @@ struct CameraProperties {
 struct RealSenseProperties {
     CameraProperties color;
     CameraProperties depth;
+    float depth_pix2mm;
 };
 
 struct PipelineWithProperties {
@@ -60,12 +62,13 @@ struct PipelineWithProperties {
 struct AtomicFrameSet {
     std::mutex mutex;
     rs2::frame colorFrame;
+    rs2::frame depthFrame;
     shared_ptr<vector<uint8_t>> depthFrameRGB;
 };
 
 bool DEBUG = false;
 
-tuple<vector<uint8_t>, bool> encodePNG(const uint8_t* data, const int width, const int height) {
+tuple<vector<uint8_t>, bool> encodeColorPNG(const uint8_t* data, const int width, const int height) {
     std::chrono::time_point<std::chrono::high_resolution_clock> start;
     if (DEBUG) {
         start = chrono::high_resolution_clock::now();
@@ -86,14 +89,49 @@ tuple<vector<uint8_t>, bool> encodePNG(const uint8_t* data, const int width, con
     return {encoded, true};
 }
 
-grpc::Status encodePNGToResponse(GetImageResponse* response, const uint8_t* data, const int width,
+tuple<unsigned char*, size_t, bool> encodeDepthPNG(const unsigned char* data, const uint width, const uint height) {
+    std::chrono::time_point<std::chrono::high_resolution_clock> start;
+    if (DEBUG) {
+        start = chrono::high_resolution_clock::now();
+    }
+
+    unsigned char* encoded = 0;
+    size_t encoded_size = 0;
+    unsigned result = lodepng_encode_memory(&encoded, &encoded_size, data, width, height, LCT_GREY, 16);
+    if (result != 0) {
+        cerr << "[GetImage]  failed to encode PNG" << endl;
+        return {encoded, encoded_size, false};
+    }
+
+    if (DEBUG) {
+        auto stop = chrono::high_resolution_clock::now();
+        auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+        cout << "[GetImage]  PNG encode:      " << duration.count() << "ms\n";
+    }
+
+    return {encoded, encoded_size, true};
+}
+
+grpc::Status encodeColorPNGToResponse(GetImageResponse* response, const uint8_t* data, const int width,
                                  const int height) {
-    const auto& [encoded, ok] = encodePNG(data, width, height);
+    const auto& [encoded, ok] = encodeColorPNG(data, width, height);
     if (!ok) {
         return grpc::Status(grpc::StatusCode::INTERNAL, "failed to encode PNG");
     }
     response->set_mime_type("image/png");
     response->set_image(encoded.data(), encoded.size());
+    return grpc::Status::OK;
+}
+
+
+grpc::Status encodeDepthPNGToResponse(GetImageResponse* response, const unsigned char* data, const uint width,
+                                 const uint height) {
+    const auto& [encoded, encoded_size, ok] = encodeDepthPNG(data, width, height);
+    if (!ok) {
+        return grpc::Status(grpc::StatusCode::INTERNAL, "failed to encode PNG");
+    }
+    response->set_mime_type("image/png");
+    response->set_image(encoded, encoded_size);
     return grpc::Status::OK;
 }
 
@@ -162,7 +200,7 @@ class CameraServiceImpl final : public CameraService::Service {
         // are ahead of the frame loop.
         this->frameSet.mutex.lock();
         auto latestColorFrame = this->frameSet.colorFrame;
-        auto latestDepthFrameRGB = this->frameSet.depthFrameRGB;
+        auto latestDepthFrame = this->frameSet.depthFrame;
         this->frameSet.mutex.unlock();
 
         if (reqName.compare("color") == 0) {
@@ -170,7 +208,7 @@ class CameraServiceImpl final : public CameraService::Service {
                 return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "color disabled");
             }
             if (reqMimeType.compare("image/png") == 0) {
-                encodePNGToResponse(response, (const uint8_t*)latestColorFrame.get_data(),
+                encodeColorPNGToResponse(response, (const uint8_t*)latestColorFrame.get_data(),
                                     this->props.color.width, this->props.color.height);
             } else {
                 encodeJPEGToResponse(response, (const unsigned char*)latestColorFrame.get_data(),
@@ -180,13 +218,8 @@ class CameraServiceImpl final : public CameraService::Service {
             if (this->disableDepth) {
                 return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "depth disabled");
             }
-            if (reqMimeType.compare("image/jpeg") == 0) {
-                encodeJPEGToResponse(response, latestDepthFrameRGB->data(), this->props.depth.width,
-                                     this->props.depth.height);
-            } else {
-                encodePNGToResponse(response, latestDepthFrameRGB->data(), this->props.depth.width,
-                                    this->props.depth.height);
-            }
+	    encodeDepthPNGToResponse(response, (const unsigned char*)latestDepthFrame.get_data(), this->props.depth.width,
+	    		    this->props.depth.height);
         }
 
         if (DEBUG) {
@@ -260,7 +293,7 @@ void frameLoop(rs2::pipeline pipeline, AtomicFrameSet& frameSet, promise<void>& 
         auto start = chrono::high_resolution_clock::now();
 
         rs2::frameset frames;
-        const uint timeoutMillis = 1000;
+        const uint timeoutMillis = 2000;
         /*
             D435 1920x1080 RGB + Depth ~20ms on a Raspberry Pi 4 Model B
         */
@@ -294,34 +327,20 @@ void frameLoop(rs2::pipeline pipeline, AtomicFrameSet& frameSet, promise<void>& 
                 auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
                 cout << "[frameLoop] frame alignment: " << duration.count() << "ms\n";
             }
+	    frameSet.mutex.lock();
+	    frameSet.colorFrame = frames.get_color_frame();
+	    frameSet.depthFrame = frames.get_depth_frame();
+	    frameSet.mutex.unlock();
+        } else if (!disableColor) {
+	    frameSet.mutex.lock();
+	    frameSet.colorFrame = frames.get_color_frame();
+	    frameSet.mutex.unlock();
+        } else if (!disableDepth) {
+	    frameSet.mutex.lock();
+	    frameSet.depthFrame = frames.get_depth_frame();
+	    frameSet.mutex.unlock();
         }
 
-        unique_ptr<vector<uint8_t>> depthFrameRGB;
-        if (!disableDepth) {
-            auto depthFrame = frames.get_depth_frame();
-            auto depthWidth = depthFrame.get_width();
-            auto depthHeight = depthFrame.get_height();
-            depthFrameRGB = make_unique<vector<uint8_t>>(depthWidth * depthHeight * 3);
-
-            // NOTE(erd): this is fast enough in -O3 (1920x1080 -> ~15ms) but could probably be
-            // better
-            const uint16_t* depthFrameData = (const uint16_t*)depthFrame.get_data();
-            for (auto yPos = 0; yPos < depthHeight; yPos++) {
-                for (auto xPos = 0; xPos < depthWidth; xPos++) {
-                    auto px = (yPos * depthWidth) + xPos;
-                    uint8_t scaled = (depthFrameData[px] >> 8) * 0.25;
-                    px *= 3;
-                    (*depthFrameRGB)[px] = scaled;
-                    (*depthFrameRGB)[px + 1] = scaled;
-                    (*depthFrameRGB)[px + 2] = scaled;
-                }
-            }
-        }
-
-        frameSet.mutex.lock();
-        frameSet.colorFrame = frames.get_color_frame();
-        frameSet.depthFrameRGB = move(depthFrameRGB);
-        frameSet.mutex.unlock();
 
         if (DEBUG) {
             auto stop = chrono::high_resolution_clock::now();
@@ -335,6 +354,21 @@ void frameLoop(rs2::pipeline pipeline, AtomicFrameSet& frameSet, promise<void>& 
         }
     }
 };
+
+// gives the pixel to mm conversion for the depth sensor
+float get_depth_scale(rs2::device dev)
+{
+    // Go over the device's sensors
+    for (rs2::sensor& sensor : dev.query_sensors())
+    {
+        // Check if the sensor if a depth sensor
+        if (rs2::depth_sensor dpt = sensor.as<rs2::depth_sensor>())
+        {
+            return dpt.get_depth_scale() * 1000.0; // rs2 gives pix2meters
+        }
+    }
+    throw std::runtime_error("Device does not have a depth sensor");
+}
 
 const PipelineWithProperties startPipeline(const int colorWidth, const int colorHeight,
                                            const int depthWidth, const int depthHeight,
@@ -353,6 +387,11 @@ const PipelineWithProperties startPipeline(const int colorWidth, const int color
     cout << "firmware:  " << selected_device.get_info(RS2_CAMERA_INFO_FIRMWARE_VERSION) << "\n";
     cout << "port:      " << selected_device.get_info(RS2_CAMERA_INFO_PHYSICAL_PORT) << "\n";
     cout << "usb type:  " << selected_device.get_info(RS2_CAMERA_INFO_USB_TYPE_DESCRIPTOR) << "\n";
+
+    float pix2mm_depth_scale = 0;
+    if (!disableDepth) {
+	pix2mm_depth_scale = get_depth_scale(selected_device);
+    }
 
     rs2::config cfg;
     cfg.enable_device(serial);
@@ -384,6 +423,7 @@ const PipelineWithProperties startPipeline(const int colorWidth, const int color
     };
 
     RealSenseProperties props;
+    props.depth_pix2mm = pix2mm_depth_scale;
     if (!disableColor) {
         auto const stream = pipeline.get_active_profile()
                                 .get_stream(RS2_STREAM_COLOR)

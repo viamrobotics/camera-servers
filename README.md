@@ -30,7 +30,8 @@ If you get an error like "failed to set power state", or "Permission denied", yo
 ```
 $ wget https://raw.githubusercontent.com/IntelRealSense/librealsense/7a7c2bcfbc03d45154ad63fa76b221b2bb9d228f/config/99-realsense-libusb.rules
 $ sudo cp 99-realsense-libusb.rules /etc/udev/rules.d/ 
-$ sudo udevadm control --reload-rules && udevadm trigger
+$ sudo udevadm control --reload-rules 
+$ sudo udevadm trigger
 ```
 
 You can also look at the official RealSense troubleshooting guide [here](https://github.com/IntelRealSense/librealsense/wiki/Troubleshooting-Q%26A#q-i-ran-the-udev-rules-script-but-linux-still-get-permission-denied).
@@ -74,7 +75,7 @@ run `make intelrealgrpcserver`
 
 You can then export an AppImage of the binary using
 ```
-cd packaging/appimages && appimage-builder --recipe mycameraserver-`uname -m`.yml
+cd packaging/appimages && appimage-builder --recipe intelrealgrpcserver-`uname -m`.yml
 ```
 ## Query a VIAM gRPC camera server
 
@@ -176,9 +177,7 @@ This will add the two cameras to your robot. They will have the names `intel:col
 Go to Config -> Components, and add the following camera model, `align_color_depth`. 
 ```
  {
-        "stream": "color",
-        "width_px": 1280, // whatever the actual height and width of your images are
-       "height_px": 720,
+        "output_image_type": "color",
     // you can get intrinsics by calling GetProperties on the intel gRPC camera server, too
         "intrinsic_parameters": { 
             "height_px": 720,

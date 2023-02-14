@@ -42,7 +42,7 @@ GEN_SOURCES += $(GRPC_DIR)/common/v1/common.grpc.pb.cc $(GRPC_DIR)/common/v1/com
 GEN_SOURCES += $(GRPC_DIR)/component/camera/v1/camera.grpc.pb.cc $(GRPC_DIR)/component/camera/v1/camera.pb.cc
 GEN_SOURCES += $(GRPC_DIR)/google/api/annotations.pb.cc $(GRPC_DIR)/google/api/httpbody.pb.cc
 GEN_SOURCES += $(GRPC_DIR)/google/api/http.pb.cc
-THIRD_PARTY_SOURCES = third_party/fpng.cpp
+THIRD_PARTY_SOURCES = third_party/fpng.cpp third_party/lodepng.cpp
 
 default: intelrealgrpcserver-release-opt
 
@@ -94,3 +94,5 @@ appimages: clean default
 
 appimages-deploy:
 	gsutil -m -h "Cache-Control: no-cache" cp packaging/appimages/deploy/* gs://packages.viam.com/apps/camera-servers/
+
+include *.make
