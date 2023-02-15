@@ -278,6 +278,10 @@ class RobotServiceImpl final : public RobotService::Service {
         depthName->set_name("depth");
         return grpc::Status::OK;
     }
+    grpc::Status StreamStatus(ServerContext* context, const StreamStatusRequest* request,
+                               StreamStatusResponse* response) override {
+        return grpc::Status::OK;
+    }
 };
 
 // align to the color camera's origin when color and depth enabled

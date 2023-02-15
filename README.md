@@ -114,13 +114,13 @@ The available VIAM camera methods are
 From within the API directory, you can run commands like
 
 ```
-$ grpcurl -plaintext -protoset -protoset <(buf build -o - buf.build/viamrobotics/api) my-server-url.local:8085 viam.robot.v1.RobotService/ResourceNames
+$ grpcurl -plaintext -protoset <(buf build -o - buf.build/viamrobotics/api) my-server-url.local:8085 viam.robot.v1.RobotService/ResourceNames
 
 
-$ grpcurl -plaintext -d '{ "name": "MyCamera" }' -protoset -protoset <(buf build -o - buf.build/viamrobotics/api) my-server-url.local:8085 viam.component.camera.v1.CameraService/GetProperties
+$ grpcurl -plaintext -d '{ "name": "color" }' -protoset <(buf build -o - buf.build/viamrobotics/api) my-server-url.local:8085 viam.component.camera.v1.CameraService/GetProperties
 
 
-$ grpcurl -max-msg-sz 10485760 -plaintext -d '{ "name": "MyCamera", "mimeType": "image/png" }' -protoset -protoset <(buf build -o - buf.build/viamrobotics/api) my-server-url.local:8085 viam.component.camera.v1.CameraService/GetImage
+$ grpcurl -max-msg-sz 10485760 -plaintext -d '{ "name": "color", "mimeType": "image/jpeg" }' -protoset <(buf build -o - buf.build/viamrobotics/api) my-server-url.local:8085 viam.component.camera.v1.CameraService/GetImage
 ```
 
 ### Handling the responses from the servers
@@ -132,7 +132,7 @@ You can use the program [jq](https://stedolan.github.io/jq/) to extract the rele
 ```
 $ cd api
 
-$ grpcurl -max-msg-sz 10485760 -plaintext -d '{ "name": "color", "mimeType": "image/jpeg" }' -protoset -protoset <(buf build -o - buf.build/viamrobotics/api) my-server-url.local:8085 viam.component.camera.v1.CameraService/GetImage | jq -r ".image" | base64 --decode >> output_image.jpeg
+$ grpcurl -max-msg-sz 10485760 -plaintext -d '{ "name": "color", "mimeType": "image/jpeg" }' -protoset <(buf build -o - buf.build/viamrobotics/api) my-server-url.local:8085 viam.component.camera.v1.CameraService/GetImage | jq -r ".image" | base64 --decode >> output_image.jpeg
 
 $ open output_image.jpeg
 ```
