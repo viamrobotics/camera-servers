@@ -396,7 +396,7 @@ const PipelineWithProperties startPipeline(const int colorWidth, const int color
     cout << "port:      " << selected_device.get_info(RS2_CAMERA_INFO_PHYSICAL_PORT) << "\n";
     cout << "usb type:  " << selected_device.get_info(RS2_CAMERA_INFO_USB_TYPE_DESCRIPTOR) << "\n";
 
-    float pix2mm_depth_scale = 0;
+    float pix2mm_depth_scale = 1.0;
     if (!disableDepth) {
 	pix2mm_depth_scale = get_depth_scale(selected_device);
     }
