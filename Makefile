@@ -94,5 +94,3 @@ appimages: clean default
 
 appimages-deploy:
 	gsutil -m -h "Cache-Control: no-cache" cp packaging/appimages/deploy/* gs://packages.viam.com/apps/camera-servers/
-
-include *.make
