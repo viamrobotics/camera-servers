@@ -62,8 +62,7 @@ struct PipelineWithProperties {
 struct AtomicFrameSet {
     std::mutex mutex;
     rs2::frame colorFrame;
-    rs2::frame depthFrame;
-    shared_ptr<vector<uint8_t>> depthFrameRGB;
+    shared_ptr<vector<uint16_t>> depthFrame;
 };
 
 bool DEBUG = false;
@@ -218,7 +217,7 @@ class CameraServiceImpl final : public CameraService::Service {
             if (this->disableDepth) {
                 return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "depth disabled");
             }
-	    encodeDepthPNGToResponse(response, (const unsigned char*)latestDepthFrame.get_data(), this->props.depth.width,
+	    encodeDepthPNGToResponse(response, (const unsigned char*)latestDepthFrame->data(), this->props.depth.width,
 	    		    this->props.depth.height);
         }
 
@@ -285,7 +284,7 @@ class RobotServiceImpl final : public RobotService::Service {
 const rs2::align FRAME_ALIGNMENT = RS2_STREAM_COLOR;
 
 void frameLoop(rs2::pipeline pipeline, AtomicFrameSet& frameSet, promise<void>& ready,
-               const bool disableColor, const bool disableDepth) {
+               const bool disableColor, const bool disableDepth, float pix2mm_depth_scale) {
     bool readyOnce = false;
     while (true) {
         auto failureWait = 5ms;
@@ -327,19 +326,28 @@ void frameLoop(rs2::pipeline pipeline, AtomicFrameSet& frameSet, promise<void>& 
                 auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
                 cout << "[frameLoop] frame alignment: " << duration.count() << "ms\n";
             }
-	    frameSet.mutex.lock();
-	    frameSet.colorFrame = frames.get_color_frame();
-	    frameSet.depthFrame = frames.get_depth_frame();
-	    frameSet.mutex.unlock();
-        } else if (!disableColor) {
-	    frameSet.mutex.lock();
-	    frameSet.colorFrame = frames.get_color_frame();
-	    frameSet.mutex.unlock();
-        } else if (!disableDepth) {
-	    frameSet.mutex.lock();
-	    frameSet.depthFrame = frames.get_depth_frame();
-	    frameSet.mutex.unlock();
-        }
+	}
+	// if the depth scale does not equal 1.0, then scale every pixel
+	auto colorFrame = frames.get_color_frame();
+	unique_ptr<vector<uint16_t>> depthFrameScaled;
+        if (!disableDepth) {
+		auto depthFrame = frames.get_depth_frame();
+		auto depthWidth = depthFrame.get_width();
+		auto depthHeight = depthFrame.get_height();
+		const uint16_t* depthFrameData = (const uint16_t*)depthFrame.get_data();
+		depthFrameScaled = make_unique<vector<uint16_t>>(depthWidth * depthHeight);
+	        for (int y = 0; y < depthHeight; y++) {
+	            for (int x = 0; x < depthWidth; x++) {
+		        auto px = (y * depthWidth) + x;
+			uint16_t depthScaled = pix2mm_depth_scale * depthFrameData[px];
+			(*depthFrameScaled)[px] = depthScaled;
+	           }
+		}
+	}
+        frameSet.mutex.lock();
+        frameSet.colorFrame = colorFrame;
+        frameSet.depthFrame = move(depthFrameScaled);
+        frameSet.mutex.unlock();
 
 
         if (DEBUG) {
@@ -550,7 +558,7 @@ int main(const int argc, const char* argv[]) {
     AtomicFrameSet latestFrames;
     promise<void> ready;
     thread cameraThread(frameLoop, pipeAndProps.pipeline, ref(latestFrames), ref(ready),
-                        disableColor, disableDepth);
+                        disableColor, disableDepth, pipeAndProps.properties.depth_pix2mm);
     cout << "waiting for camera frame loop thread to be ready..." << flush;
     ready.get_future().wait();
     cout << " ready!" << endl;
