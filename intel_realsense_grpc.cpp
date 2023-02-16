@@ -51,7 +51,7 @@ struct CameraProperties {
 struct RealSenseProperties {
     CameraProperties color;
     CameraProperties depth;
-    float depth_pix2mm;
+    float depthScaleMm;
 };
 
 struct PipelineWithProperties {
@@ -75,14 +75,14 @@ tuple<vector<uint8_t>, bool> encodeColorPNG(const uint8_t* data, const int width
 
     vector<uint8_t> encoded;
     if (!fpng::fpng_encode_image_to_memory(data, width, height, 3, encoded)) {
-        cerr << "[GetImage]  failed to encode PNG" << endl;
+        cerr << "[GetImage]  failed to encode color PNG" << endl;
         return {encoded, false};
     }
 
     if (DEBUG) {
         auto stop = chrono::high_resolution_clock::now();
         auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-        cout << "[GetImage]  PNG encode:      " << duration.count() << "ms\n";
+        cout << "[GetImage]  PNG color encode:      " << duration.count() << "ms\n";
     }
 
     return {encoded, true};
@@ -98,14 +98,14 @@ tuple<unsigned char*, size_t, bool> encodeDepthPNG(const unsigned char* data, co
     size_t encoded_size = 0;
     unsigned result = lodepng_encode_memory(&encoded, &encoded_size, data, width, height, LCT_GREY, 16);
     if (result != 0) {
-        cerr << "[GetImage]  failed to encode PNG" << endl;
+        cerr << "[GetImage]  failed to encode depth PNG" << endl;
         return {encoded, encoded_size, false};
     }
 
     if (DEBUG) {
         auto stop = chrono::high_resolution_clock::now();
         auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-        cout << "[GetImage]  PNG encode:      " << duration.count() << "ms\n";
+        cout << "[GetImage]  PNG depth encode:      " << duration.count() << "ms\n";
     }
 
     return {encoded, encoded_size, true};
@@ -115,7 +115,7 @@ grpc::Status encodeColorPNGToResponse(GetImageResponse* response, const uint8_t*
                                  const int height) {
     const auto& [encoded, ok] = encodeColorPNG(data, width, height);
     if (!ok) {
-        return grpc::Status(grpc::StatusCode::INTERNAL, "failed to encode PNG");
+        return grpc::Status(grpc::StatusCode::INTERNAL, "failed to encode color PNG");
     }
     response->set_mime_type("image/png");
     response->set_image(encoded.data(), encoded.size());
@@ -127,10 +127,11 @@ grpc::Status encodeDepthPNGToResponse(GetImageResponse* response, const unsigned
                                  const uint height) {
     const auto& [encoded, encoded_size, ok] = encodeDepthPNG(data, width, height);
     if (!ok) {
-        return grpc::Status(grpc::StatusCode::INTERNAL, "failed to encode PNG");
+        return grpc::Status(grpc::StatusCode::INTERNAL, "failed to encode depth PNG");
     }
     response->set_mime_type("image/png");
     response->set_image(encoded, encoded_size);
+    std::free(encoded);
     return grpc::Status::OK;
 }
 
@@ -155,7 +156,7 @@ tuple<unsigned char*, long unsigned int, bool> encodeJPEG(const unsigned char* d
     if (DEBUG) {
         auto stop = chrono::high_resolution_clock::now();
         auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-        cout << "[GetImage]  JPEG encode:     " << duration.count() << "ms\n";
+        cout << "[GetImage]  JPEG color encode:     " << duration.count() << "ms\n";
     }
 
     return {encoded, encodedSize, true};
@@ -165,7 +166,7 @@ grpc::Status encodeJPEGToResponse(GetImageResponse* response, const unsigned cha
                                   const int width, const int height) {
     const auto& [encoded, encodedSize, ok] = encodeJPEG(data, width, height);
     if (!ok) {
-        return grpc::Status(grpc::StatusCode::INTERNAL, "failed to encode JPEG");
+        return grpc::Status(grpc::StatusCode::INTERNAL, "failed to encode color JPEG");
     }
     response->set_mime_type("image/jpeg");
     response->set_image(encoded, encodedSize);
@@ -284,7 +285,7 @@ class RobotServiceImpl final : public RobotService::Service {
 const rs2::align FRAME_ALIGNMENT = RS2_STREAM_COLOR;
 
 void frameLoop(rs2::pipeline pipeline, AtomicFrameSet& frameSet, promise<void>& ready,
-               const bool disableColor, const bool disableDepth, float pix2mm_depth_scale) {
+               const bool disableColor, const bool disableDepth, float depthScaleMm) {
     bool readyOnce = false;
     while (true) {
         auto failureWait = 5ms;
@@ -298,8 +299,10 @@ void frameLoop(rs2::pipeline pipeline, AtomicFrameSet& frameSet, promise<void>& 
         */
         bool succ = pipeline.try_wait_for_frames(&frames, timeoutMillis);
         if (!succ) {
-            cerr << "[frameLoop] could not get frames from realsense after " << timeoutMillis
-                 << "ms" << endl;
+            if (DEBUG) {
+                cerr << "[frameLoop] could not get frames from realsense after " << timeoutMillis
+                     << "ms" << endl;
+            }
             this_thread::sleep_for(failureWait);
             continue;
         }
@@ -328,24 +331,25 @@ void frameLoop(rs2::pipeline pipeline, AtomicFrameSet& frameSet, promise<void>& 
             }
 	}
 	// if the depth scale does not equal 1.0, then scale every pixel
-	auto colorFrame = frames.get_color_frame();
 	unique_ptr<vector<uint16_t>> depthFrameScaled;
         if (!disableDepth) {
-		auto depthFrame = frames.get_depth_frame();
+		auto depthFrame = frames.getDepthFrame();
 		auto depthWidth = depthFrame.get_width();
 		auto depthHeight = depthFrame.get_height();
 		const uint16_t* depthFrameData = (const uint16_t*)depthFrame.get_data();
+        // NOTE(erd): this is fast enough in -O3 (1920x1080 -> ~15ms) but could probably be
+        // better
 		depthFrameScaled = make_unique<vector<uint16_t>>(depthWidth * depthHeight);
 	        for (int y = 0; y < depthHeight; y++) {
 	            for (int x = 0; x < depthWidth; x++) {
 		        auto px = (y * depthWidth) + x;
-			uint16_t depthScaled = pix2mm_depth_scale * depthFrameData[px];
+			uint16_t depthScaled = depthScaleMm * depthFrameData[px];
 			(*depthFrameScaled)[px] = depthScaled;
 	           }
 		}
 	}
         frameSet.mutex.lock();
-        frameSet.colorFrame = colorFrame;
+        frameSet.colorFrame = frames.get_color_frame();
         frameSet.depthFrame = move(depthFrameScaled);
         frameSet.mutex.unlock();
 
@@ -364,7 +368,7 @@ void frameLoop(rs2::pipeline pipeline, AtomicFrameSet& frameSet, promise<void>& 
 };
 
 // gives the pixel to mm conversion for the depth sensor
-float get_depth_scale(rs2::device dev)
+float getDepthScale(rs2::device dev)
 {
     // Go over the device's sensors
     for (rs2::sensor& sensor : dev.query_sensors())
@@ -372,7 +376,7 @@ float get_depth_scale(rs2::device dev)
         // Check if the sensor if a depth sensor
         if (rs2::depth_sensor dpt = sensor.as<rs2::depth_sensor>())
         {
-            return dpt.get_depth_scale() * 1000.0; // rs2 gives pix2meters
+            return dpt.getDepthScale() * 1000.0; // rs2 gives pix2meters
         }
     }
     throw std::runtime_error("Device does not have a depth sensor");
@@ -396,9 +400,9 @@ const PipelineWithProperties startPipeline(const int colorWidth, const int color
     cout << "port:      " << selected_device.get_info(RS2_CAMERA_INFO_PHYSICAL_PORT) << "\n";
     cout << "usb type:  " << selected_device.get_info(RS2_CAMERA_INFO_USB_TYPE_DESCRIPTOR) << "\n";
 
-    float pix2mm_depth_scale = 1.0;
+    float depthScaleMm = 1.0;
     if (!disableDepth) {
-	pix2mm_depth_scale = get_depth_scale(selected_device);
+	    depthScaleMm = getDepthScale(selected_device);
     }
 
     rs2::config cfg;
@@ -431,7 +435,7 @@ const PipelineWithProperties startPipeline(const int colorWidth, const int color
     };
 
     RealSenseProperties props;
-    props.depth_pix2mm = pix2mm_depth_scale;
+    props.depthScaleMm = depthScaleMm;
     if (!disableColor) {
         auto const stream = pipeline.get_active_profile()
                                 .get_stream(RS2_STREAM_COLOR)
@@ -558,7 +562,7 @@ int main(const int argc, const char* argv[]) {
     AtomicFrameSet latestFrames;
     promise<void> ready;
     thread cameraThread(frameLoop, pipeAndProps.pipeline, ref(latestFrames), ref(ready),
-                        disableColor, disableDepth, pipeAndProps.properties.depth_pix2mm);
+                        disableColor, disableDepth, pipeAndProps.properties.depthScaleMm);
     cout << "waiting for camera frame loop thread to be ready..." << flush;
     ready.get_future().wait();
     cout << " ready!" << endl;
