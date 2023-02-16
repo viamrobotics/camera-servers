@@ -330,7 +330,7 @@ void frameLoop(rs2::pipeline pipeline, AtomicFrameSet& frameSet, promise<void>& 
                 cout << "[frameLoop] frame alignment: " << duration.count() << "ms\n";
             }
 	}
-	// if the depth scale does not equal 1.0, then scale every pixel
+	// scale every pixel value to be depth in units of mm
 	unique_ptr<vector<uint16_t>> depthFrameScaled;
         if (!disableDepth) {
 		auto depthFrame = frames.getDepthFrame();
@@ -400,7 +400,7 @@ const PipelineWithProperties startPipeline(const int colorWidth, const int color
     cout << "port:      " << selected_device.get_info(RS2_CAMERA_INFO_PHYSICAL_PORT) << "\n";
     cout << "usb type:  " << selected_device.get_info(RS2_CAMERA_INFO_USB_TYPE_DESCRIPTOR) << "\n";
 
-    float depthScaleMm = 1.0;
+    float depthScaleMm = 0.0;
     if (!disableDepth) {
 	    depthScaleMm = getDepthScale(selected_device);
     }
