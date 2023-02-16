@@ -66,27 +66,9 @@ struct AtomicFrameSet {
 };
 
 bool DEBUG = false;
+std::string rgbaMagicNumber = "RGBA"
+std::string depthMagicNumber = "DEPTHMAP"
 
-tuple<vector<uint8_t>, bool> encodeColorPNG(const uint8_t* data, const int width, const int height) {
-    std::chrono::time_point<std::chrono::high_resolution_clock> start;
-    if (DEBUG) {
-        start = chrono::high_resolution_clock::now();
-    }
-
-    vector<uint8_t> encoded;
-    if (!fpng::fpng_encode_image_to_memory(data, width, height, 3, encoded)) {
-        cerr << "[GetImage]  failed to encode color PNG" << endl;
-        return {encoded, false};
-    }
-
-    if (DEBUG) {
-        auto stop = chrono::high_resolution_clock::now();
-        auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-        cout << "[GetImage]  PNG color encode:      " << duration.count() << "ms\n";
-    }
-
-    return {encoded, true};
-}
 
 tuple<unsigned char*, size_t, bool> encodeDepthPNG(const unsigned char* data, const uint width, const uint height) {
     std::chrono::time_point<std::chrono::high_resolution_clock> start;
@@ -111,6 +93,76 @@ tuple<unsigned char*, size_t, bool> encodeDepthPNG(const unsigned char* data, co
     return {encoded, encoded_size, true};
 }
 
+grpc::Status encodeDepthPNGToResponse(GetImageResponse* response, const unsigned char* data, const uint width,
+                                 const uint height) {
+    const auto& [encoded, encoded_size, ok] = encodeDepthPNG(data, width, height);
+    if (!ok) {
+        return grpc::Status(grpc::StatusCode::INTERNAL, "failed to encode depth PNG");
+    }
+    response->set_mime_type("image/png");
+    response->set_image(encoded, encoded_size);
+    std::free(encoded);
+    return grpc::Status::OK;
+}
+
+tuple<std::vector<char>, bool> encodeDepthRAW(const unsigned char* data, const uint width, const uint height) {
+    std::chrono::time_point<std::chrono::high_resolution_clock> start;
+    if (DEBUG) {
+        start = chrono::high_resolution_clock::now();
+    }
+
+    // Depth header contains 8 bytes worth of magic number, followed by 8 bytes for width and another 8 bytes for height 
+    // each pixel has 2 bytes.
+    size_t pixelByteCount = 2*width*height;
+    size_t totalByteCount = 24 + pixelByteCount;
+    std::vector<char> rawDepth;
+    rawDepth.reserve(totalByteCount);
+    std::copy(&depthMagicNumber, &depthMagicNumber + 8, std::back_inserter(rawDepth));
+    std::copy(&width, &width + 8, std::back_inserter(rawDepth));
+    std::copy(&height, &height + 8, std::back_inserter(rawDepth));
+    std::copy(data, data + pixelByteCount, std::back_inserter(rawDepth));
+
+    if (DEBUG) {
+        auto stop = chrono::high_resolution_clock::now();
+        auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+        cout << "[GetImage]  RAW depth encode:      " << duration.count() << "ms\n";
+    }
+
+    return {rawDepth, true};
+}
+
+grpc::Status encodeDepthRAWToResponse(GetImageResponse* response, const unsigned char* data, const uint width,
+                                 const uint height) {
+    const auto& [encoded, ok] = encodeDepthRAW(data, width, height);
+    if (!ok) {
+        return grpc::Status(grpc::StatusCode::INTERNAL, "failed to encode depth RAW");
+    }
+    response->set_mime_type("image/vnd.viam.dep");
+    response->set_image(encoded.data(), encoded.size());
+    return grpc::Status::OK;
+}
+
+tuple<vector<uint8_t>, bool> encodeColorPNG(const uint8_t* data, const int width, const int height) {
+    std::chrono::time_point<std::chrono::high_resolution_clock> start;
+    if (DEBUG) {
+        start = chrono::high_resolution_clock::now();
+    }
+
+    vector<uint8_t> encoded;
+    if (!fpng::fpng_encode_image_to_memory(data, width, height, 3, encoded)) {
+        cerr << "[GetImage]  failed to encode color PNG" << endl;
+        return {encoded, false};
+    }
+
+    if (DEBUG) {
+        auto stop = chrono::high_resolution_clock::now();
+        auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+        cout << "[GetImage]  PNG color encode:      " << duration.count() << "ms\n";
+    }
+
+    return {encoded, true};
+}
+
 grpc::Status encodeColorPNGToResponse(GetImageResponse* response, const uint8_t* data, const int width,
                                  const int height) {
     const auto& [encoded, ok] = encodeColorPNG(data, width, height);
@@ -122,19 +174,6 @@ grpc::Status encodeColorPNGToResponse(GetImageResponse* response, const uint8_t*
     return grpc::Status::OK;
 }
 
-
-grpc::Status encodeDepthPNGToResponse(GetImageResponse* response, const unsigned char* data, const uint width,
-                                 const uint height) {
-    const auto& [encoded, encoded_size, ok] = encodeDepthPNG(data, width, height);
-    if (!ok) {
-        std::free(encoded);
-        return grpc::Status(grpc::StatusCode::INTERNAL, "failed to encode depth PNG");
-    }
-    response->set_mime_type("image/png");
-    response->set_image(encoded, encoded_size);
-    std::free(encoded);
-    return grpc::Status::OK;
-}
 
 tuple<unsigned char*, long unsigned int, bool> encodeJPEG(const unsigned char* data,
                                                           const int width, const int height) {
