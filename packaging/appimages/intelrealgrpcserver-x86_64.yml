@@ -34,6 +34,7 @@ AppDir:
     - libopencv-imgcodecs4.5:amd64
     - libprotobuf31:amd64
     - libgrpc++1:amd64
+    - libturbojpeg0:amd64
   files:
     include: []
     exclude:
