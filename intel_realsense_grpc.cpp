@@ -333,7 +333,7 @@ void frameLoop(rs2::pipeline pipeline, AtomicFrameSet& frameSet, promise<void>& 
 	// scale every pixel value to be depth in units of mm
 	unique_ptr<vector<uint16_t>> depthFrameScaled;
         if (!disableDepth) {
-		auto depthFrame = frames.getDepthFrame();
+		auto depthFrame = frames.get_depth_frame();
 		auto depthWidth = depthFrame.get_width();
 		auto depthHeight = depthFrame.get_height();
 		const uint16_t* depthFrameData = (const uint16_t*)depthFrame.get_data();
@@ -376,7 +376,7 @@ float getDepthScale(rs2::device dev)
         // Check if the sensor if a depth sensor
         if (rs2::depth_sensor dpt = sensor.as<rs2::depth_sensor>())
         {
-            return dpt.getDepthScale() * 1000.0; // rs2 gives pix2meters
+            return dpt.get_depth_scale() * 1000.0; // rs2 gives pix2meters
         }
     }
     throw std::runtime_error("Device does not have a depth sensor");
