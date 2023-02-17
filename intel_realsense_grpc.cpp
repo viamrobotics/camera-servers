@@ -127,6 +127,7 @@ grpc::Status encodeDepthPNGToResponse(GetImageResponse* response, const unsigned
                                  const uint height) {
     const auto& [encoded, encoded_size, ok] = encodeDepthPNG(data, width, height);
     if (!ok) {
+        std::free(encoded);
         return grpc::Status(grpc::StatusCode::INTERNAL, "failed to encode depth PNG");
     }
     response->set_mime_type("image/png");
