@@ -35,6 +35,8 @@ $ sudo udevadm trigger
 ```
 
 You can also look at the official RealSense troubleshooting guide [here](https://github.com/IntelRealSense/librealsense/wiki/Troubleshooting-Q%26A#q-i-ran-the-udev-rules-script-but-linux-still-get-permission-denied).
+
+The intelrealgrpcserver takes advantage of faster USB ports. Use the (blue) USB 3.0 port on the Raspberry Pi for faster streaming and access to more resolution options.
  
 ## Building gRPC server from Source
 
