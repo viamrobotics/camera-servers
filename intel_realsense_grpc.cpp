@@ -66,8 +66,8 @@ struct AtomicFrameSet {
 };
 
 bool DEBUG = false;
-std::string rgbaMagicNumber = "RGBA"
-std::string depthMagicNumber = "DEPTHMAP"
+std::string rgbaMagicNumber = "RGBA";
+std::string depthMagicNumber = "DEPTHMAP";
 
 
 tuple<unsigned char*, size_t, bool> encodeDepthPNG(const unsigned char* data, const uint width, const uint height) {
@@ -105,7 +105,7 @@ grpc::Status encodeDepthPNGToResponse(GetImageResponse* response, const unsigned
     return grpc::Status::OK;
 }
 
-tuple<std::vector<char>, bool> encodeDepthRAW(const unsigned char* data, const uint width, const uint height) {
+tuple<unsigned char*, size_t, bool> encodeDepthRAW(const unsigned char* data, const uint64_t width, const uint64_t height) {
     std::chrono::time_point<std::chrono::high_resolution_clock> start;
     if (DEBUG) {
         start = chrono::high_resolution_clock::now();
@@ -115,12 +115,16 @@ tuple<std::vector<char>, bool> encodeDepthRAW(const unsigned char* data, const u
     // each pixel has 2 bytes.
     size_t pixelByteCount = 2*width*height;
     size_t totalByteCount = 24 + pixelByteCount;
-    std::vector<char> rawDepth;
-    rawDepth.reserve(totalByteCount);
-    std::copy(&depthMagicNumber, &depthMagicNumber + 8, std::back_inserter(rawDepth));
-    std::copy(&width, &width + 8, std::back_inserter(rawDepth));
-    std::copy(&height, &height + 8, std::back_inserter(rawDepth));
-    std::copy(data, data + pixelByteCount, std::back_inserter(rawDepth));
+    //std::vector<u_char> rawDept;
+    //std::copy(&depthMagicNumber, &depthMagicNumber + 8, std::back_inserter(rawDepth));
+    //std::copy(&width, &width + 8, std::back_inserter(rawDepth));
+    //std::copy(&height, &height + 8, std::back_inserter(rawDepth));
+    //std::copy(data, data + pixelByteCount, std::back_inserter(rawDepth));
+    unsigned char rawDepth[totalByteCount];
+    std::memcpy(&rawDepth[0], &depthMagicNumber, 8);
+    std::memcpy(&rawDepth[0]+8, &width, 8);
+    std::memcpy(&rawDepth[0]+16, &height, 8);
+    std::memcpy(&rawDepth[0]+24, data, pixelByteCount);
 
     if (DEBUG) {
         auto stop = chrono::high_resolution_clock::now();
@@ -128,17 +132,61 @@ tuple<std::vector<char>, bool> encodeDepthRAW(const unsigned char* data, const u
         cout << "[GetImage]  RAW depth encode:      " << duration.count() << "ms\n";
     }
 
-    return {rawDepth, true};
+    return {&rawDepth[0], totalByteCount, true};
 }
 
 grpc::Status encodeDepthRAWToResponse(GetImageResponse* response, const unsigned char* data, const uint width,
                                  const uint height) {
-    const auto& [encoded, ok] = encodeDepthRAW(data, width, height);
+    const auto& [encoded, encodedSize, ok] = encodeDepthRAW(data, width, height);
     if (!ok) {
         return grpc::Status(grpc::StatusCode::INTERNAL, "failed to encode depth RAW");
     }
     response->set_mime_type("image/vnd.viam.dep");
-    response->set_image(encoded.data(), encoded.size());
+    response->set_image(encoded, encodedSize);
+    std::free(encoded);
+    return grpc::Status::OK;
+}
+
+tuple<unsigned char*, size_t, bool> encodeColorRAW(const unsigned char* data, const uint32_t width, const uint32_t height) {
+    std::chrono::time_point<std::chrono::high_resolution_clock> start;
+    if (DEBUG) {
+        start = chrono::high_resolution_clock::now();
+    }
+
+    // Color header contains 4 bytes worth of magic number, followed by 4 bytes for width and another 4 bytes for height 
+    // each pixel has 3 bytes.
+    size_t pixelByteCount = 3*width*height;
+    size_t totalByteCount = 12 + pixelByteCount;
+    //std::vector<u_char> rawDept;
+    //std::copy(&depthMagicNumber, &depthMagicNumber + 8, std::back_inserter(rawDepth));
+    //std::copy(&width, &width + 8, std::back_inserter(rawDepth));
+    //std::copy(&height, &height + 8, std::back_inserter(rawDepth));
+    //std::copy(data, data + pixelByteCount, std::back_inserter(rawDepth));
+    unsigned char* rawColorBuf;
+    rawColorBuf = (unsigned char *)std::malloc(totalByteCount);
+    std::memcpy(rawColorBuf, &depthMagicNumber, 4);
+    std::memcpy(rawColorBuf+4, &width, 4);
+    std::memcpy(rawColorBuf+8, &height, 4);
+    std::memcpy(rawColorBuf+12, data, pixelByteCount);
+
+    if (DEBUG) {
+        auto stop = chrono::high_resolution_clock::now();
+        auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+        cout << "[GetImage]  RAW color encode:      " << duration.count() << "ms\n";
+    }
+
+    return {rawColorBuf, totalByteCount, true};
+}
+
+grpc::Status encodeColorRAWToResponse(GetImageResponse* response, const unsigned char* data, const uint width,
+                                 const uint height) {
+    const auto& [encoded, encodedSize, ok] = encodeColorRAW(data, width, height);
+    if (!ok) {
+        return grpc::Status(grpc::StatusCode::INTERNAL, "failed to encode color RAW");
+    }
+    response->set_mime_type("image/vnd.viam.rgba");
+    response->set_image(encoded, encodedSize);
+    std::free(encoded);
     return grpc::Status::OK;
 }
 
@@ -250,6 +298,9 @@ class CameraServiceImpl final : public CameraService::Service {
             if (reqMimeType.compare("image/png") == 0 || reqMimeType.compare("image/png+lazy") == 0) {
                 encodeColorPNGToResponse(response, (const uint8_t*)latestColorFrame.get_data(),
                                     this->props.color.width, this->props.color.height);
+            } else if (reqMimeType.compare("image/vnd.viam.rgba") == 0) {
+                encodeColorRAWToResponse(response, (const unsigned char*)latestColorFrame.get_data(),
+                                    this->props.color.width, this->props.color.height);
             } else {
                 encodeJPEGToResponse(response, (const unsigned char*)latestColorFrame.get_data(),
                                      this->props.color.width, this->props.color.height);
@@ -258,8 +309,13 @@ class CameraServiceImpl final : public CameraService::Service {
             if (this->disableDepth) {
                 return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "depth disabled");
             }
-	    encodeDepthPNGToResponse(response, (const unsigned char*)latestDepthFrame->data(), this->props.depth.width,
+            if (reqMimeType.compare("image/vnd.viam.dep") == 0) {
+                encodeDepthRAWToResponse(response, (const unsigned char*)latestDepthFrame->data(),
+                                    this->props.color.width, this->props.color.height);
+	        } else {
+                encodeDepthPNGToResponse(response, (const unsigned char*)latestDepthFrame->data(), this->props.depth.width,
 	    		    this->props.depth.height);
+            }
         }
 
         if (DEBUG) {
