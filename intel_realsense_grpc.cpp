@@ -78,91 +78,6 @@ void intToByteArray(const uint num, unsigned char* intBytes) {
     }
 }
 
-// DEPTH responses
-tuple<unsigned char*, size_t, bool> encodeDepthPNG(const unsigned char* data, const uint width, const uint height) {
-    std::chrono::time_point<std::chrono::high_resolution_clock> start;
-    if (DEBUG) {
-        start = chrono::high_resolution_clock::now();
-    }
-
-    unsigned char* encoded = 0;
-    size_t encoded_size = 0;
-    unsigned result = lodepng_encode_memory(&encoded, &encoded_size, data, width, height, LCT_GREY, 16);
-    if (result != 0) {
-        cerr << "[GetImage]  failed to encode depth PNG" << endl;
-        return {encoded, encoded_size, false};
-    }
-
-    if (DEBUG) {
-        auto stop = chrono::high_resolution_clock::now();
-        auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-        cout << "[GetImage]  PNG depth encode:      " << duration.count() << "ms\n";
-    }
-
-    return {encoded, encoded_size, true};
-}
-
-grpc::Status encodeDepthPNGToResponse(GetImageResponse* response, const unsigned char* data, const uint width,
-                                 const uint height) {
-    const auto& [encoded, encoded_size, ok] = encodeDepthPNG(data, width, height);
-    if (!ok) {
-        return grpc::Status(grpc::StatusCode::INTERNAL, "failed to encode depth PNG");
-    }
-    response->set_mime_type("image/png");
-    response->set_image(encoded, encoded_size);
-    std::free(encoded);
-    return grpc::Status::OK;
-}
-
-tuple<unsigned char*, size_t, bool> encodeDepthRAW(const unsigned char* data, const uint64_t width, const uint64_t height) {
-    std::chrono::time_point<std::chrono::high_resolution_clock> start;
-    if (DEBUG) {
-        start = chrono::high_resolution_clock::now();
-    }
-
-    // Depth header contains 8 bytes worth of magic number, followed by 8 bytes for width and another 8 bytes for height 
-    // each pixel has 2 bytes.
-    size_t pixelByteCount = 2*width*height;
-    size_t magicByteCount = sizeof(depthMagicNumber);
-    size_t widthByteCount = sizeof(width);
-    size_t heightByteCount = sizeof(height);
-    size_t totalByteCount = magicByteCount + widthByteCount + heightByteCount + pixelByteCount;
-    unsigned char widthBytes[widthByteCount];
-    intToByteArray(width, widthBytes);
-    unsigned char heightBytes[heightByteCount];
-    intToByteArray(height, heightBytes);
-    unsigned char* rawBuf = new unsigned char[totalByteCount];
-    int offset = 0;
-    std::memcpy(rawBuf + offset, &depthMagicNumber, magicByteCount); 
-    offset += magicByteCount;
-    std::memcpy(rawBuf + offset, widthBytes, widthByteCount);
-    offset += widthByteCount;
-    std::memcpy(rawBuf + offset, heightBytes, heightByteCount);
-    offset += heightByteCount;
-    std::memcpy(rawBuf + offset, data, pixelByteCount);
-
-    if (DEBUG) {
-        auto stop = chrono::high_resolution_clock::now();
-        auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-        cout << "[GetImage]  RAW depth encode:      " << duration.count() << "ms\n";
-    }
-
-    return {rawBuf, totalByteCount, true};
-}
-
-grpc::Status encodeDepthRAWToResponse(GetImageResponse* response, const unsigned char* data, const uint width,
-                                 const uint height) {
-    const auto& [encoded, encodedSize, ok] = encodeDepthRAW(data, width, height);
-    if (!ok) {
-        std::free(encoded);
-        return grpc::Status(grpc::StatusCode::INTERNAL, "failed to encode depth RAW");
-    }
-    response->set_mime_type("image/vnd.viam.dep");
-    response->set_image(encoded, encodedSize);
-    std::free(encoded);
-    return grpc::Status::OK;
-}
-
 // COLOR responses
 tuple<vector<uint8_t>, bool> encodeColorPNG(const uint8_t* data, const int width, const int height) {
     std::chrono::time_point<std::chrono::high_resolution_clock> start;
@@ -289,6 +204,92 @@ grpc::Status encodeColorRAWToResponse(GetImageResponse* response, const unsigned
     std::free(encoded);
     return grpc::Status::OK;
 }
+
+// DEPTH responses
+tuple<unsigned char*, size_t, bool> encodeDepthPNG(const unsigned char* data, const uint width, const uint height) {
+    std::chrono::time_point<std::chrono::high_resolution_clock> start;
+    if (DEBUG) {
+        start = chrono::high_resolution_clock::now();
+    }
+
+    unsigned char* encoded = 0;
+    size_t encoded_size = 0;
+    unsigned result = lodepng_encode_memory(&encoded, &encoded_size, data, width, height, LCT_GREY, 16);
+    if (result != 0) {
+        cerr << "[GetImage]  failed to encode depth PNG" << endl;
+        return {encoded, encoded_size, false};
+    }
+
+    if (DEBUG) {
+        auto stop = chrono::high_resolution_clock::now();
+        auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+        cout << "[GetImage]  PNG depth encode:      " << duration.count() << "ms\n";
+    }
+
+    return {encoded, encoded_size, true};
+}
+
+grpc::Status encodeDepthPNGToResponse(GetImageResponse* response, const unsigned char* data, const uint width,
+                                 const uint height) {
+    const auto& [encoded, encoded_size, ok] = encodeDepthPNG(data, width, height);
+    if (!ok) {
+        return grpc::Status(grpc::StatusCode::INTERNAL, "failed to encode depth PNG");
+    }
+    response->set_mime_type("image/png");
+    response->set_image(encoded, encoded_size);
+    std::free(encoded);
+    return grpc::Status::OK;
+}
+
+tuple<unsigned char*, size_t, bool> encodeDepthRAW(const unsigned char* data, const uint64_t width, const uint64_t height) {
+    std::chrono::time_point<std::chrono::high_resolution_clock> start;
+    if (DEBUG) {
+        start = chrono::high_resolution_clock::now();
+    }
+
+    // Depth header contains 8 bytes worth of magic number, followed by 8 bytes for width and another 8 bytes for height 
+    // each pixel has 2 bytes.
+    size_t pixelByteCount = 2*width*height;
+    size_t magicByteCount = sizeof(depthMagicNumber);
+    size_t widthByteCount = sizeof(width);
+    size_t heightByteCount = sizeof(height);
+    size_t totalByteCount = magicByteCount + widthByteCount + heightByteCount + pixelByteCount;
+    unsigned char widthBytes[widthByteCount];
+    intToByteArray(width, widthBytes);
+    unsigned char heightBytes[heightByteCount];
+    intToByteArray(height, heightBytes);
+    unsigned char* rawBuf = new unsigned char[totalByteCount];
+    int offset = 0;
+    std::memcpy(rawBuf + offset, &depthMagicNumber, magicByteCount); 
+    offset += magicByteCount;
+    std::memcpy(rawBuf + offset, widthBytes, widthByteCount);
+    offset += widthByteCount;
+    std::memcpy(rawBuf + offset, heightBytes, heightByteCount);
+    offset += heightByteCount;
+    std::memcpy(rawBuf + offset, data, pixelByteCount);
+
+    if (DEBUG) {
+        auto stop = chrono::high_resolution_clock::now();
+        auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+        cout << "[GetImage]  RAW depth encode:      " << duration.count() << "ms\n";
+    }
+
+    return {rawBuf, totalByteCount, true};
+}
+
+grpc::Status encodeDepthRAWToResponse(GetImageResponse* response, const unsigned char* data, const uint width,
+                                 const uint height) {
+    const auto& [encoded, encodedSize, ok] = encodeDepthRAW(data, width, height);
+    if (!ok) {
+        std::free(encoded);
+        return grpc::Status(grpc::StatusCode::INTERNAL, "failed to encode depth RAW");
+    }
+    response->set_mime_type("image/vnd.viam.dep");
+    response->set_image(encoded, encodedSize);
+    std::free(encoded);
+    return grpc::Status::OK;
+}
+
 
 // CAMERA service
 class CameraServiceImpl final : public CameraService::Service {
