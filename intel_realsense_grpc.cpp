@@ -208,7 +208,7 @@ class CameraServiceImpl final : public CameraService::Service {
             if (this->disableColor) {
                 return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "color disabled");
             }
-            if (reqMimeType.compare("image/png") == 0) {
+            if (reqMimeType.compare("image/png") == 0 || reqMimeType.compare("image/png+lazy") == 0) {
                 encodeColorPNGToResponse(response, (const uint8_t*)latestColorFrame.get_data(),
                                     this->props.color.width, this->props.color.height);
             } else {
