@@ -69,6 +69,94 @@ bool DEBUG = false;
 const uint32_t rgbaMagicNumber = 1094862674; // the utf-8 binary encoding for "RGBA", big-endian
 const uint64_t depthMagicNumber = 5782988369567958340; // the utf-8 binary encoding for "DEPTHMAP", big-endian
 
+void intToByteArray(const uint num, unsigned char* intBytes) {
+    size_t nBytes = sizeof(intBytes);
+    int shift = nBytes*8;
+    for (int i = 0; i < nBytes; i++) {
+        shift = shift - 8;
+        intBytes[i] = (num >> shift) & 0xFF;
+    }
+}
+
+tuple<unsigned char*, size_t, bool> encodeColorRAW(const unsigned char* data, const uint32_t width, const uint32_t height) {
+    std::chrono::time_point<std::chrono::high_resolution_clock> start;
+    if (DEBUG) {
+        start = chrono::high_resolution_clock::now();
+    }
+
+    // Color header contains 4 bytes worth of magic number, followed by 4 bytes for width and another 4 bytes for height 
+    // each pixel has 4 bytes, one for each channel (RGBA).
+    size_t pixelByteCount = 4*width*height;
+    size_t magicByteCount = sizeof(rgbaMagicNumber);
+    size_t widthByteCount = sizeof(width);
+    size_t heightByteCount = sizeof(height);
+    size_t totalByteCount = magicByteCount + widthByteCount + heightByteCount + pixelByteCount;
+    unsigned char widthBytes[widthByteCount];
+    intToByteArray(width, widthBytes);
+    unsigned char heightBytes[heightByteCount];
+    intToByteArray(height, heightBytes);
+    unsigned char* rawBuf = new unsigned char[totalByteCount];
+    int offset = 0;
+    std::memcpy(rawBuf + offset, &rgbaMagicNumber, magicByteCount); 
+    offset += magicByteCount;
+    std::memcpy(rawBuf + offset, widthBytes, widthByteCount);
+    offset += widthByteCount;
+    std::memcpy(rawBuf + offset, heightBytes, heightByteCount);
+    offset += heightByteCount;
+    int pixelOffset = 0;
+    uint8_t alphaValue = 255; // alpha  channel is always 255 for color images
+    for (int i = 0; i < width*height; i++) {
+        std::memcpy(rawBuf + offset, data + pixelOffset, 3); // 3 bytes for RGB
+        std::memcpy(rawBuf + offset+3, &alphaValue, 1); // 1 byte for A
+        pixelOffset += 3;
+        offset += 4;
+    }
+    if (DEBUG) {
+        auto stop = chrono::high_resolution_clock::now();
+        auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+        cout << "[GetImage]  RAW color encode:      " << duration.count() << "ms\n";
+    }
+
+    return {rawBuf, totalByteCount, true};
+}
+
+
+tuple<unsigned char*, size_t, bool> encodeDepthRAW(const unsigned char* data, const uint64_t width, const uint64_t height) {
+    std::chrono::time_point<std::chrono::high_resolution_clock> start;
+    if (DEBUG) {
+        start = chrono::high_resolution_clock::now();
+    }
+
+    // Depth header contains 8 bytes worth of magic number, followed by 8 bytes for width and another 8 bytes for height 
+    // each pixel has 2 bytes.
+    size_t pixelByteCount = 2*width*height;
+    size_t magicByteCount = sizeof(depthMagicNumber);
+    size_t widthByteCount = sizeof(width);
+    size_t heightByteCount = sizeof(height);
+    size_t totalByteCount = magicByteCount + widthByteCount + heightByteCount + pixelByteCount;
+    unsigned char widthBytes[widthByteCount];
+    intToByteArray(width, widthBytes);
+    unsigned char heightBytes[heightByteCount];
+    intToByteArray(height, heightBytes);
+    unsigned char* rawBuf = new unsigned char[totalByteCount];
+    int offset = 0;
+    std::memcpy(rawBuf + offset, &depthMagicNumber, magicByteCount); 
+    offset += magicByteCount;
+    std::memcpy(rawBuf + offset, widthBytes, widthByteCount);
+    offset += widthByteCount;
+    std::memcpy(rawBuf + offset, heightBytes, heightByteCount);
+    offset += heightByteCount;
+    std::memcpy(rawBuf + offset, data, pixelByteCount);
+
+    if (DEBUG) {
+        auto stop = chrono::high_resolution_clock::now();
+        auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+        cout << "[GetImage]  RAW depth encode:      " << duration.count() << "ms\n";
+    }
+
+    return {rawBuf, totalByteCount, true};
+}
+
 
 tuple<unsigned char*, size_t, bool> encodeDepthPNG(const unsigned char* data, const uint width, const uint height) {
     std::chrono::time_point<std::chrono::high_resolution_clock> start;
@@ -105,44 +193,6 @@ grpc::Status encodeDepthPNGToResponse(GetImageResponse* response, const unsigned
     return grpc::Status::OK;
 }
 
-tuple<unsigned char*, size_t, bool> encodeDepthRAW(const unsigned char* data, const uint64_t width, const uint64_t height) {
-    std::chrono::time_point<std::chrono::high_resolution_clock> start;
-    if (DEBUG) {
-        start = chrono::high_resolution_clock::now();
-    }
-
-    // Depth header contains 8 bytes worth of magic number, followed by 8 bytes for width and another 8 bytes for height 
-    // each pixel has 2 bytes.
-    size_t pixelByteCount = 2*width*height;
-    if (std::strlen((char*)data) != 2*width*height) {
-        std::cout << "data had length of " << std::strlen((char*)data) <<  " which was not 2*width*height." << std::endl;
-    }
-    size_t magicByteCount = sizeof(depthMagicNumber);
-    assert (magicByteCount == 8);
-    size_t widthByteCount = sizeof(width);
-    assert (widthByteCount == 8);
-    size_t heightByteCount = sizeof(height);
-    assert (heightByteCount == 8);
-    size_t totalByteCount = magicByteCount + widthByteCount + heightByteCount + pixelByteCount;
-    unsigned char* rawBuf = new unsigned char[totalByteCount];
-    int offset = 0;
-    std::memcpy(rawBuf + offset, &depthMagicNumber, magicByteCount); 
-    offset += magicByteCount;
-    std::memcpy(rawBuf + offset, &width, widthByteCount);
-    offset += widthByteCount;
-    std::memcpy(rawBuf + offset, &height, heightByteCount);
-    offset += heightByteCount;
-    std::memcpy(rawBuf + offset, data, pixelByteCount);
-
-    if (DEBUG) {
-        auto stop = chrono::high_resolution_clock::now();
-        auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-        cout << "[GetImage]  RAW depth encode:      " << duration.count() << "ms\n";
-    }
-
-    return {rawBuf, totalByteCount, true};
-}
-
 grpc::Status encodeDepthRAWToResponse(GetImageResponse* response, const unsigned char* data, const uint width,
                                  const uint height) {
     const auto& [encoded, encodedSize, ok] = encodeDepthRAW(data, width, height);
@@ -154,60 +204,6 @@ grpc::Status encodeDepthRAWToResponse(GetImageResponse* response, const unsigned
     response->set_image(encoded, encodedSize);
     std::free(encoded);
     return grpc::Status::OK;
-}
-
-tuple<unsigned char*, size_t, bool> encodeColorRAW(const unsigned char* data, const uint32_t width, const uint32_t height) {
-    std::chrono::time_point<std::chrono::high_resolution_clock> start;
-    if (DEBUG) {
-        start = chrono::high_resolution_clock::now();
-    }
-
-    // Color header contains 4 bytes worth of magic number, followed by 4 bytes for width and another 4 bytes for height 
-    // each pixel has 4 bytes, one for each channel (RGBA).
-    size_t pixelByteCount = 4*width*height;
-    size_t magicByteCount = sizeof(rgbaMagicNumber);
-    size_t widthByteCount = sizeof(width);
-    size_t heightByteCount = sizeof(height);
-    assert (magicByteCount == 4);
-    assert (widthByteCount == 4);
-    assert (heightByteCount == 4);
-    size_t totalByteCount = magicByteCount + widthByteCount + heightByteCount + pixelByteCount;
-    unsigned char* rawBuf = new unsigned char[totalByteCount];
-    unsigned char widthBytes[4];
-    widthBytes[0] = (width >> 24) & 0xFF;
-    widthBytes[1] = (width >> 16) & 0xFF;
-    widthBytes[2] = (width >> 8) & 0xFF;
-    widthBytes[3] = (width >> 0) & 0xFF;
-    unsigned char heightBytes[4];
-    heightBytes[0] = (height >> 24) & 0xFF;
-    heightBytes[1] = (height >> 16) & 0xFF;
-    heightBytes[2] = (height >> 8) & 0xFF;
-    heightBytes[3] = (height >> 0) & 0xFF;
-
-
-    int offset = 0;
-    std::memcpy(rawBuf + offset, &rgbaMagicNumber, magicByteCount); 
-    offset += magicByteCount;
-    std::memcpy(rawBuf + offset, widthBytes, widthByteCount);
-    offset += widthByteCount;
-    std::memcpy(rawBuf + offset, heightBytes, heightByteCount);
-    offset += heightByteCount;
-    int pixelOffset = 0;
-    uint8_t alphaValue = 255; // alpha  channel is always 255 for color images
-    for (int i = 0; i < width*height; i++) {
-        std::memcpy(rawBuf + offset, data + pixelOffset, 3); // 3 bytes for RGB
-        std::memcpy(rawBuf + offset+3, &alphaValue, 1); // 1 byte for A
-        pixelOffset += 3;
-        offset += 4;
-    }
-
-    if (DEBUG) {
-        auto stop = chrono::high_resolution_clock::now();
-        auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-        cout << "[GetImage]  RAW color encode:      " << duration.count() << "ms\n";
-    }
-
-    return {rawBuf, totalByteCount, true};
 }
 
 grpc::Status encodeColorRAWToResponse(GetImageResponse* response, const unsigned char* data, const uint width,
