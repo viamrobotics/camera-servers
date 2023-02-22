@@ -70,74 +70,17 @@ struct AtomicFrameSet {
 };
 
 bool DEBUG = false;
-const uint32_t rgbaMagicNumber = 1380401729;  // the utf-8 binary encoding for "RGBA", big-endian
+const uint32_t rgbaMagicNumber =
+    htonl(1380401729);                 // the utf-8 binary encoding for "RGBA", big-endian
 const size_t rgbaMagicByteCount = 4;   // number of bytes used to represent the rgba magic number
 const size_t rgbaWidthByteCount = 4;   // number of bytes used to represent rgba image width
 const size_t rgbaHeightByteCount = 4;  // number of bytes used to represent rgba image height
 
 const uint64_t depthMagicNumber =
-    4919426490892632400;                // the utf-8 binary encoding for "DEPTHMAP", big-endian
+    htonll(4919426490892632400);        // the utf-8 binary encoding for "DEPTHMAP", big-endian
 const size_t depthMagicByteCount = 8;   // number of bytes used to represent the depth magic number
 const size_t depthWidthByteCount = 8;   // number of bytes used to represent depth image width
 const size_t depthHeightByteCount = 8;  // number of bytes used to represent depth image height
-
-tuple<unsigned char*, size_t> encodeRAW(uint64_t magicNumber, uint64_t width, uint64_t height,
-                                        const unsigned char* data) {
-    // set size of raw file
-    size_t magicByteCount = 0;
-    size_t widthByteCount = 0;
-    size_t heightByteCount = 0;
-    size_t pixelByteCount = 0;
-    uint64_t widthToEncode = width;
-    uint64_t heightToEncode = height;
-    uint64_t magicNumberToEncode = magicNumber;
-    if (magicNumber == rgbaMagicNumber) {
-        // copy the 4 bytes of magic number, height, and width in the higher register of uint64_t
-        // in order to make sure that conversion to big-endian does not mess up the uint32_t
-        // dimensions for rgba.
-        widthToEncode = width << 32 | width;
-        heightToEncode = height << 32 | height;
-        magicNumberToEncode = magicNumber << 32 | magicNumber;
-        magicByteCount = rgbaMagicByteCount;
-        widthByteCount = rgbaWidthByteCount;
-        heightByteCount = rgbaHeightByteCount;
-        pixelByteCount = 4 * width * height;  // 4 bytes for RGBA
-    } else if (magicNumber == depthMagicNumber) {
-        magicByteCount = depthMagicByteCount;
-        widthByteCount = depthWidthByteCount;
-        heightByteCount = depthHeightByteCount;
-        pixelByteCount = 2 * width * height;  // 2 bytes for Z16
-    } else {
-        throw std::runtime_error("encodeRAW: data is not depth nor color data");
-    }
-    // make sure all the ints are big-endian
-    widthToEncode = htonll(widthToEncode);              // make sure everything is big-endian
-    heightToEncode = htonll(heightToEncode);            // make sure everything is big-endian
-    magicNumberToEncode = htonll(magicNumberToEncode);  // make sure everything is big-endian
-    size_t totalByteCount = magicByteCount + widthByteCount + heightByteCount + pixelByteCount;
-    // memcpy data into buffer
-    unsigned char* rawBuf = new unsigned char[totalByteCount];
-    int offset = 0;
-    std::memcpy(rawBuf + offset, &magicNumberToEncode, magicByteCount);
-    offset += magicByteCount;
-    std::memcpy(rawBuf + offset, &widthToEncode, widthByteCount);
-    offset += widthByteCount;
-    std::memcpy(rawBuf + offset, &heightToEncode, heightByteCount);
-    offset += heightByteCount;
-    if (magicNumber == rgbaMagicNumber) {
-        int pixelOffset = 0;
-        uint8_t alphaValue = 255;  // alpha  channel is always 255 for color images
-        for (int i = 0; i < width * height; i++) {
-            std::memcpy(rawBuf + offset, data + pixelOffset, 3);  // 3 bytes for RGB
-            std::memcpy(rawBuf + offset + 3, &alphaValue, 1);     // 1 byte for A
-            pixelOffset += 3;
-            offset += 4;
-        }
-    } else {
-        std::memcpy(rawBuf + offset, data, pixelByteCount);
-    }
-    return {rawBuf, totalByteCount};
-}
 
 // COLOR responses
 tuple<vector<uint8_t>, bool> encodeColorPNG(const uint8_t* data, const int width,
@@ -218,15 +161,36 @@ tuple<unsigned char*, size_t, bool> encodeColorRAW(const unsigned char* data, co
     if (DEBUG) {
         start = chrono::high_resolution_clock::now();
     }
-    const auto& [encoded, encodedSize] = encodeRAW(rgbaMagicNumber, width, height, data);
-
+    // set size of raw file
+    size_t pixelByteCount = 4 * width * height;
+    uint32_t widthToEncode = htonl(width);    // make sure everything is big-endian
+    uint32_t heightToEncode = htonl(height);  // make sure everything is big-endian
+    size_t totalByteCount =
+        rgbaMagicByteCount + rgbaWidthByteCount + rgbaHeightByteCount + pixelByteCount;
+    // memcpy data into buffer
+    unsigned char* rawBuf = new unsigned char[totalByteCount];
+    int offset = 0;
+    std::memcpy(rawBuf + offset, &rgbaMagicNumber, rgbaMagicByteCount);
+    offset += rgbaMagicByteCount;
+    std::memcpy(rawBuf + offset, &widthToEncode, rgbaWidthByteCount);
+    offset += rgbaWidthByteCount;
+    std::memcpy(rawBuf + offset, &heightToEncode, rgbaHeightByteCount);
+    offset += rgbaHeightByteCount;
+    int pixelOffset = 0;
+    uint8_t alphaValue = 255;  // alpha  channel is always 255 for color images
+    for (int i = 0; i < width * height; i++) {
+        std::memcpy(rawBuf + offset, data + pixelOffset, 3);  // 3 bytes for RGB
+        std::memcpy(rawBuf + offset + 3, &alphaValue, 1);     // 1 byte for A
+        pixelOffset += 3;
+        offset += 4;
+    }
     if (DEBUG) {
         auto stop = chrono::high_resolution_clock::now();
         auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
         cout << "[GetImage]  RAW color encode:      " << duration.count() << "ms\n";
     }
 
-    return {encoded, encodedSize, true};
+    return {rawBuf, totalByteCount, true};
 }
 
 grpc::Status encodeColorRAWToResponse(GetImageResponse* response, const unsigned char* data,
@@ -288,7 +252,21 @@ tuple<unsigned char*, size_t, bool> encodeDepthRAW(const unsigned char* data, co
     }
     // Depth header contains 8 bytes worth of magic number, followed by 8 bytes for width and
     // another 8 bytes for height each pixel has 2 bytes.
-    const auto& [encoded, encodedSize] = encodeRAW(depthMagicNumber, width, height, data);
+    size_t pixelByteCount = 2 * width * height;
+    uint64_t widthToEncode = htonll(width);    // make sure everything is big-endian
+    uint64_t heightToEncode = htonll(height);  // make sure everything is big-endian
+    size_t totalByteCount =
+        depthMagicByteCount + depthWidthByteCount + depthHeightByteCount + pixelByteCount;
+    // memcpy data into buffer
+    unsigned char* rawBuf = new unsigned char[totalByteCount];
+    int offset = 0;
+    std::memcpy(rawBuf + offset, &depthMagicNumber, depthMagicByteCount);
+    offset += depthMagicByteCount;
+    std::memcpy(rawBuf + offset, &widthToEncode, depthWidthByteCount);
+    offset += depthWidthByteCount;
+    std::memcpy(rawBuf + offset, &heightToEncode, depthHeightByteCount);
+    offset += depthHeightByteCount;
+    std::memcpy(rawBuf + offset, data, pixelByteCount);
 
     if (DEBUG) {
         auto stop = chrono::high_resolution_clock::now();
@@ -296,7 +274,7 @@ tuple<unsigned char*, size_t, bool> encodeDepthRAW(const unsigned char* data, co
         cout << "[GetImage]  RAW depth encode:      " << duration.count() << "ms\n";
     }
 
-    return {encoded, encodedSize, true};
+    return {rawBuf, totalByteCount, true};
 }
 
 grpc::Status encodeDepthRAWToResponse(GetImageResponse* response, const unsigned char* data,
