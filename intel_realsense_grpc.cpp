@@ -72,15 +72,15 @@ struct AtomicFrameSet {
 bool DEBUG = false;
 const uint32_t rgbaMagicNumber =
     htonl(1380401729);                 // the utf-8 binary encoding for "RGBA", big-endian
-const size_t rgbaMagicByteCount = 4;   // number of bytes used to represent the rgba magic number
-const size_t rgbaWidthByteCount = 4;   // number of bytes used to represent rgba image width
-const size_t rgbaHeightByteCount = 4;  // number of bytes used to represent rgba image height
+const size_t rgbaMagicByteCount = sizeof(uint32_t);   // number of bytes used to represent the rgba magic number
+const size_t rgbaWidthByteCount = sizeof(uint32_t);   // number of bytes used to represent rgba image width
+const size_t rgbaHeightByteCount = sizeof(uint32_t);  // number of bytes used to represent rgba image height
 
 const uint64_t depthMagicNumber =
     htonll(4919426490892632400);        // the utf-8 binary encoding for "DEPTHMAP", big-endian
-const size_t depthMagicByteCount = 8;   // number of bytes used to represent the depth magic number
-const size_t depthWidthByteCount = 8;   // number of bytes used to represent depth image width
-const size_t depthHeightByteCount = 8;  // number of bytes used to represent depth image height
+const size_t depthMagicByteCount = sizeof(uint64_t);   // number of bytes used to represent the depth magic number
+const size_t depthWidthByteCount = sizeof(uint64_t);   // number of bytes used to represent depth image width
+const size_t depthHeightByteCount = sizeof(uint64_t);  // number of bytes used to represent depth image height
 
 // COLOR responses
 tuple<vector<uint8_t>, bool> encodeColorPNG(const uint8_t* data, const int width,
