@@ -70,12 +70,13 @@ struct AtomicFrameSet {
 };
 
 bool DEBUG = false;
-const uint32_t rgbaMagicNumber = 1094862674;  // the utf-8 binary encoding for "RGBA"
+const uint32_t rgbaMagicNumber = 1380401729;  // the utf-8 binary encoding for "RGBA", big-endian
 const size_t rgbaMagicByteCount = 4;   // number of bytes used to represent the rgba magic number
 const size_t rgbaWidthByteCount = 4;   // number of bytes used to represent rgba image width
 const size_t rgbaHeightByteCount = 4;  // number of bytes used to represent rgba image height
 
-const uint64_t depthMagicNumber = 5782988369567958340;  // the utf-8 binary encoding for "DEPTHMAP"
+const uint64_t depthMagicNumber =
+    4919426490892632400;                // the utf-8 binary encoding for "DEPTHMAP", big-endian
 const size_t depthMagicByteCount = 8;   // number of bytes used to represent the depth magic number
 const size_t depthWidthByteCount = 8;   // number of bytes used to represent depth image width
 const size_t depthHeightByteCount = 8;  // number of bytes used to represent depth image height
@@ -89,12 +90,14 @@ tuple<unsigned char*, size_t> encodeRAW(uint64_t magicNumber, uint64_t width, ui
     size_t pixelByteCount = 0;
     uint64_t widthToEncode = width;
     uint64_t heightToEncode = height;
+    uint64_t magicNumberToEncode = magicNumber;
     if (magicNumber == rgbaMagicNumber) {
-        // copy the 4 bytes of height and width in the higher register of uint64_t
+        // copy the 4 bytes of magic number, height, and width in the higher register of uint64_t
         // in order to make sure that conversion to big-endian does not mess up the uint32_t
         // dimensions for rgba.
         widthToEncode = width << 32 | width;
         heightToEncode = height << 32 | height;
+        magicNumberToEncode = magicNumber << 32 | magicNumber;
         magicByteCount = rgbaMagicByteCount;
         widthByteCount = rgbaWidthByteCount;
         heightByteCount = rgbaHeightByteCount;
@@ -107,13 +110,15 @@ tuple<unsigned char*, size_t> encodeRAW(uint64_t magicNumber, uint64_t width, ui
     } else {
         throw std::runtime_error("encodeRAW: data is not depth nor color data");
     }
-    widthToEncode = htonll(widthToEncode);    // make sure everything is big-endian
-    heightToEncode = htonll(heightToEncode);  // make sure everything is big-endian
+    // make sure all the ints are big-endian
+    widthToEncode = htonll(widthToEncode);              // make sure everything is big-endian
+    heightToEncode = htonll(heightToEncode);            // make sure everything is big-endian
+    magicNumberToEncode = htonll(magicNumberToEncode);  // make sure everything is big-endian
     size_t totalByteCount = magicByteCount + widthByteCount + heightByteCount + pixelByteCount;
     // memcpy data into buffer
     unsigned char* rawBuf = new unsigned char[totalByteCount];
     int offset = 0;
-    std::memcpy(rawBuf + offset, &magicNumber, magicByteCount);
+    std::memcpy(rawBuf + offset, &magicNumberToEncode, magicByteCount);
     offset += magicByteCount;
     std::memcpy(rawBuf + offset, &widthToEncode, widthByteCount);
     offset += widthByteCount;
