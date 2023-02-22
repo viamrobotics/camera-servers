@@ -1,3 +1,4 @@
+#include <arpa/inet.h>
 #include <grpc/grpc.h>
 #include <grpcpp/security/server_credentials.h>
 #include <grpcpp/server.h>
@@ -18,8 +19,8 @@
 #include "component/camera/v1/camera.pb.h"
 #include "robot/v1/robot.grpc.pb.h"
 #include "robot/v1/robot.pb.h"
-#include "third_party/lodepng.h"
 #include "third_party/fpng.h"
+#include "third_party/lodepng.h"
 
 using namespace std;
 using grpc::Server;
@@ -36,6 +37,9 @@ using viam::component::camera::v1::IntrinsicParameters;
 using viam::robot::v1::ResourceNamesRequest;
 using viam::robot::v1::ResourceNamesResponse;
 using viam::robot::v1::RobotService;
+
+#define htonll(x) \
+    ((1 == htonl(1)) ? (x) : ((uint64_t)htonl((x)&0xFFFFFFFF) << 32) | htonl((x) >> 32))
 
 struct CameraProperties {
     int width;
@@ -66,20 +70,73 @@ struct AtomicFrameSet {
 };
 
 bool DEBUG = false;
-const uint32_t rgbaMagicNumber = 1094862674; // the utf-8 binary encoding for "RGBA", big-endian
-const uint64_t depthMagicNumber = 5782988369567958340; // the utf-8 binary encoding for "DEPTHMAP", big-endian
+const uint32_t rgbaMagicNumber = 1094862674;  // the utf-8 binary encoding for "RGBA"
+const size_t rgbaMagicByteCount = 4;   // number of bytes used to represent the rgba magic number
+const size_t rgbaWidthByteCount = 4;   // number of bytes used to represent rgba image width
+const size_t rgbaHeightByteCount = 4;  // number of bytes used to represent rgba image height
 
-void intToByteArray(const uint num, unsigned char* intBytes) {
-    size_t nBytes = sizeof(intBytes);
-    int shift = nBytes*8;
-    for (int i = 0; i < nBytes; i++) {
-        shift = shift - 8;
-        intBytes[i] = (num >> shift) & 0xFF;
+const uint64_t depthMagicNumber = 5782988369567958340;  // the utf-8 binary encoding for "DEPTHMAP"
+const size_t depthMagicByteCount = 8;   // number of bytes used to represent the depth magic number
+const size_t depthWidthByteCount = 8;   // number of bytes used to represent depth image width
+const size_t depthHeightByteCount = 8;  // number of bytes used to represent depth image height
+
+tuple<unsigned char*, size_t> encodeRAW(uint64_t magicNumber, uint64_t width, uint64_t height,
+                                        const unsigned char* data) {
+    // set size of raw file
+    size_t magicByteCount = 0;
+    size_t widthByteCount = 0;
+    size_t heightByteCount = 0;
+    size_t pixelByteCount = 0;
+    uint64_t widthToEncode = width;
+    uint64_t heightToEncode = height;
+    if (magicNumber == rgbaMagicNumber) {
+        // copy the 4 bytes of height and width in the higher register of uint64_t
+        // in order to make sure that conversion to big-endian does not mess up the uint32_t
+        // dimensions for rgba.
+        widthToEncode = width << 32 | width;
+        heightToEncode = height << 32 | height;
+        magicByteCount = rgbaMagicByteCount;
+        widthByteCount = rgbaWidthByteCount;
+        heightByteCount = rgbaHeightByteCount;
+        pixelByteCount = 4 * width * height;  // 4 bytes for RGBA
+    } else if (magicNumber == depthMagicNumber) {
+        magicByteCount = depthMagicByteCount;
+        widthByteCount = depthWidthByteCount;
+        heightByteCount = depthHeightByteCount;
+        pixelByteCount = 2 * width * height;  // 2 bytes for Z16
+    } else {
+        throw std::runtime_error("encodeRAW: data is not depth nor color data");
     }
+    widthToEncode = htonll(widthToEncode);    // make sure everything is big-endian
+    heightToEncode = htonll(heightToEncode);  // make sure everything is big-endian
+    size_t totalByteCount = magicByteCount + widthByteCount + heightByteCount + pixelByteCount;
+    // memcpy data into buffer
+    unsigned char* rawBuf = new unsigned char[totalByteCount];
+    int offset = 0;
+    std::memcpy(rawBuf + offset, &magicNumber, magicByteCount);
+    offset += magicByteCount;
+    std::memcpy(rawBuf + offset, &widthToEncode, widthByteCount);
+    offset += widthByteCount;
+    std::memcpy(rawBuf + offset, &heightToEncode, heightByteCount);
+    offset += heightByteCount;
+    if (magicNumber == rgbaMagicNumber) {
+        int pixelOffset = 0;
+        uint8_t alphaValue = 255;  // alpha  channel is always 255 for color images
+        for (int i = 0; i < width * height; i++) {
+            std::memcpy(rawBuf + offset, data + pixelOffset, 3);  // 3 bytes for RGB
+            std::memcpy(rawBuf + offset + 3, &alphaValue, 1);     // 1 byte for A
+            pixelOffset += 3;
+            offset += 4;
+        }
+    } else {
+        std::memcpy(rawBuf + offset, data, pixelByteCount);
+    }
+    return {rawBuf, totalByteCount};
 }
 
 // COLOR responses
-tuple<vector<uint8_t>, bool> encodeColorPNG(const uint8_t* data, const int width, const int height) {
+tuple<vector<uint8_t>, bool> encodeColorPNG(const uint8_t* data, const int width,
+                                            const int height) {
     std::chrono::time_point<std::chrono::high_resolution_clock> start;
     if (DEBUG) {
         start = chrono::high_resolution_clock::now();
@@ -100,8 +157,8 @@ tuple<vector<uint8_t>, bool> encodeColorPNG(const uint8_t* data, const int width
     return {encoded, true};
 }
 
-grpc::Status encodeColorPNGToResponse(GetImageResponse* response, const uint8_t* data, const int width,
-                                 const int height) {
+grpc::Status encodeColorPNGToResponse(GetImageResponse* response, const uint8_t* data,
+                                      const int width, const int height) {
     const auto& [encoded, ok] = encodeColorPNG(data, width, height);
     if (!ok) {
         return grpc::Status(grpc::StatusCode::INTERNAL, "failed to encode color PNG");
@@ -150,50 +207,25 @@ grpc::Status encodeJPEGToResponse(GetImageResponse* response, const unsigned cha
     return grpc::Status::OK;
 }
 
-tuple<unsigned char*, size_t, bool> encodeColorRAW(const unsigned char* data, const uint32_t width, const uint32_t height) {
+tuple<unsigned char*, size_t, bool> encodeColorRAW(const unsigned char* data, const uint32_t width,
+                                                   const uint32_t height) {
     std::chrono::time_point<std::chrono::high_resolution_clock> start;
     if (DEBUG) {
         start = chrono::high_resolution_clock::now();
     }
+    const auto& [encoded, encodedSize] = encodeRAW(rgbaMagicNumber, width, height, data);
 
-    // Color header contains 4 bytes worth of magic number, followed by 4 bytes for width and another 4 bytes for height 
-    // each pixel has 4 bytes, one for each channel (RGBA).
-    size_t pixelByteCount = 4*width*height;
-    size_t magicByteCount = sizeof(rgbaMagicNumber);
-    size_t widthByteCount = sizeof(width);
-    size_t heightByteCount = sizeof(height);
-    size_t totalByteCount = magicByteCount + widthByteCount + heightByteCount + pixelByteCount;
-    unsigned char widthBytes[widthByteCount];
-    intToByteArray(width, widthBytes);
-    unsigned char heightBytes[heightByteCount];
-    intToByteArray(height, heightBytes);
-    unsigned char* rawBuf = new unsigned char[totalByteCount];
-    int offset = 0;
-    std::memcpy(rawBuf + offset, &rgbaMagicNumber, magicByteCount); 
-    offset += magicByteCount;
-    std::memcpy(rawBuf + offset, widthBytes, widthByteCount);
-    offset += widthByteCount;
-    std::memcpy(rawBuf + offset, heightBytes, heightByteCount);
-    offset += heightByteCount;
-    int pixelOffset = 0;
-    uint8_t alphaValue = 255; // alpha  channel is always 255 for color images
-    for (int i = 0; i < width*height; i++) {
-        std::memcpy(rawBuf + offset, data + pixelOffset, 3); // 3 bytes for RGB
-        std::memcpy(rawBuf + offset+3, &alphaValue, 1); // 1 byte for A
-        pixelOffset += 3;
-        offset += 4;
-    }
     if (DEBUG) {
         auto stop = chrono::high_resolution_clock::now();
         auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
         cout << "[GetImage]  RAW color encode:      " << duration.count() << "ms\n";
     }
 
-    return {rawBuf, totalByteCount, true};
+    return {encoded, encodedSize, true};
 }
 
-grpc::Status encodeColorRAWToResponse(GetImageResponse* response, const unsigned char* data, const uint width,
-                                 const uint height) {
+grpc::Status encodeColorRAWToResponse(GetImageResponse* response, const unsigned char* data,
+                                      const uint width, const uint height) {
     const auto& [encoded, encodedSize, ok] = encodeColorRAW(data, width, height);
     if (!ok) {
         std::free(encoded);
@@ -206,7 +238,8 @@ grpc::Status encodeColorRAWToResponse(GetImageResponse* response, const unsigned
 }
 
 // DEPTH responses
-tuple<unsigned char*, size_t, bool> encodeDepthPNG(const unsigned char* data, const uint width, const uint height) {
+tuple<unsigned char*, size_t, bool> encodeDepthPNG(const unsigned char* data, const uint width,
+                                                   const uint height) {
     std::chrono::time_point<std::chrono::high_resolution_clock> start;
     if (DEBUG) {
         start = chrono::high_resolution_clock::now();
@@ -214,7 +247,8 @@ tuple<unsigned char*, size_t, bool> encodeDepthPNG(const unsigned char* data, co
 
     unsigned char* encoded = 0;
     size_t encoded_size = 0;
-    unsigned result = lodepng_encode_memory(&encoded, &encoded_size, data, width, height, LCT_GREY, 16);
+    unsigned result =
+        lodepng_encode_memory(&encoded, &encoded_size, data, width, height, LCT_GREY, 16);
     if (result != 0) {
         cerr << "[GetImage]  failed to encode depth PNG" << endl;
         return {encoded, encoded_size, false};
@@ -229,8 +263,8 @@ tuple<unsigned char*, size_t, bool> encodeDepthPNG(const unsigned char* data, co
     return {encoded, encoded_size, true};
 }
 
-grpc::Status encodeDepthPNGToResponse(GetImageResponse* response, const unsigned char* data, const uint width,
-                                 const uint height) {
+grpc::Status encodeDepthPNGToResponse(GetImageResponse* response, const unsigned char* data,
+                                      const uint width, const uint height) {
     const auto& [encoded, encoded_size, ok] = encodeDepthPNG(data, width, height);
     if (!ok) {
         return grpc::Status(grpc::StatusCode::INTERNAL, "failed to encode depth PNG");
@@ -241,32 +275,15 @@ grpc::Status encodeDepthPNGToResponse(GetImageResponse* response, const unsigned
     return grpc::Status::OK;
 }
 
-tuple<unsigned char*, size_t, bool> encodeDepthRAW(const unsigned char* data, const uint64_t width, const uint64_t height) {
+tuple<unsigned char*, size_t, bool> encodeDepthRAW(const unsigned char* data, const uint64_t width,
+                                                   const uint64_t height) {
     std::chrono::time_point<std::chrono::high_resolution_clock> start;
     if (DEBUG) {
         start = chrono::high_resolution_clock::now();
     }
-
-    // Depth header contains 8 bytes worth of magic number, followed by 8 bytes for width and another 8 bytes for height 
-    // each pixel has 2 bytes.
-    size_t pixelByteCount = 2*width*height;
-    size_t magicByteCount = sizeof(depthMagicNumber);
-    size_t widthByteCount = sizeof(width);
-    size_t heightByteCount = sizeof(height);
-    size_t totalByteCount = magicByteCount + widthByteCount + heightByteCount + pixelByteCount;
-    unsigned char widthBytes[widthByteCount];
-    intToByteArray(width, widthBytes);
-    unsigned char heightBytes[heightByteCount];
-    intToByteArray(height, heightBytes);
-    unsigned char* rawBuf = new unsigned char[totalByteCount];
-    int offset = 0;
-    std::memcpy(rawBuf + offset, &depthMagicNumber, magicByteCount); 
-    offset += magicByteCount;
-    std::memcpy(rawBuf + offset, widthBytes, widthByteCount);
-    offset += widthByteCount;
-    std::memcpy(rawBuf + offset, heightBytes, heightByteCount);
-    offset += heightByteCount;
-    std::memcpy(rawBuf + offset, data, pixelByteCount);
+    // Depth header contains 8 bytes worth of magic number, followed by 8 bytes for width and
+    // another 8 bytes for height each pixel has 2 bytes.
+    const auto& [encoded, encodedSize] = encodeRAW(depthMagicNumber, width, height, data);
 
     if (DEBUG) {
         auto stop = chrono::high_resolution_clock::now();
@@ -274,11 +291,11 @@ tuple<unsigned char*, size_t, bool> encodeDepthRAW(const unsigned char* data, co
         cout << "[GetImage]  RAW depth encode:      " << duration.count() << "ms\n";
     }
 
-    return {rawBuf, totalByteCount, true};
+    return {encoded, encodedSize, true};
 }
 
-grpc::Status encodeDepthRAWToResponse(GetImageResponse* response, const unsigned char* data, const uint width,
-                                 const uint height) {
+grpc::Status encodeDepthRAWToResponse(GetImageResponse* response, const unsigned char* data,
+                                      const uint width, const uint height) {
     const auto& [encoded, encodedSize, ok] = encodeDepthRAW(data, width, height);
     if (!ok) {
         std::free(encoded);
@@ -289,7 +306,6 @@ grpc::Status encodeDepthRAWToResponse(GetImageResponse* response, const unsigned
     std::free(encoded);
     return grpc::Status::OK;
 }
-
 
 // CAMERA service
 class CameraServiceImpl final : public CameraService::Service {
@@ -325,12 +341,14 @@ class CameraServiceImpl final : public CameraService::Service {
             if (this->disableColor) {
                 return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "color disabled");
             }
-            if (reqMimeType.compare("image/png") == 0 || reqMimeType.compare("image/png+lazy") == 0) {
+            if (reqMimeType.compare("image/png") == 0 ||
+                reqMimeType.compare("image/png+lazy") == 0) {
                 encodeColorPNGToResponse(response, (const uint8_t*)latestColorFrame.get_data(),
-                                    this->props.color.width, this->props.color.height);
+                                         this->props.color.width, this->props.color.height);
             } else if (reqMimeType.compare("image/vnd.viam.rgba") == 0) {
-                encodeColorRAWToResponse(response, (const unsigned char*)latestColorFrame.get_data(),
-                                    this->props.color.width, this->props.color.height);
+                encodeColorRAWToResponse(response,
+                                         (const unsigned char*)latestColorFrame.get_data(),
+                                         this->props.color.width, this->props.color.height);
             } else {
                 encodeJPEGToResponse(response, (const unsigned char*)latestColorFrame.get_data(),
                                      this->props.color.width, this->props.color.height);
@@ -341,10 +359,10 @@ class CameraServiceImpl final : public CameraService::Service {
             }
             if (reqMimeType.compare("image/vnd.viam.dep") == 0) {
                 encodeDepthRAWToResponse(response, (const unsigned char*)latestDepthFrame->data(),
-                                    this->props.color.width, this->props.color.height);
-	        } else {
-                encodeDepthPNGToResponse(response, (const unsigned char*)latestDepthFrame->data(), this->props.depth.width,
-	    		    this->props.depth.height);
+                                         this->props.color.width, this->props.color.height);
+            } else {
+                encodeDepthPNGToResponse(response, (const unsigned char*)latestDepthFrame->data(),
+                                         this->props.depth.width, this->props.depth.height);
             }
         }
 
@@ -455,30 +473,29 @@ void frameLoop(rs2::pipeline pipeline, AtomicFrameSet& frameSet, promise<void>& 
                 auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
                 cout << "[frameLoop] frame alignment: " << duration.count() << "ms\n";
             }
-	}
-	// scale every pixel value to be depth in units of mm
-	unique_ptr<vector<uint16_t>> depthFrameScaled;
+        }
+        // scale every pixel value to be depth in units of mm
+        unique_ptr<vector<uint16_t>> depthFrameScaled;
         if (!disableDepth) {
-		auto depthFrame = frames.get_depth_frame();
-		auto depthWidth = depthFrame.get_width();
-		auto depthHeight = depthFrame.get_height();
-		const uint16_t* depthFrameData = (const uint16_t*)depthFrame.get_data();
-        // NOTE(erd): this is fast enough in -O3 (1920x1080 -> ~15ms) but could probably be
-        // better
-		depthFrameScaled = make_unique<vector<uint16_t>>(depthWidth * depthHeight);
-	        for (int y = 0; y < depthHeight; y++) {
-	            for (int x = 0; x < depthWidth; x++) {
-		        auto px = (y * depthWidth) + x;
-			uint16_t depthScaled = depthScaleMm * depthFrameData[px];
-			(*depthFrameScaled)[px] = depthScaled;
-	           }
-		}
-	}
+            auto depthFrame = frames.get_depth_frame();
+            auto depthWidth = depthFrame.get_width();
+            auto depthHeight = depthFrame.get_height();
+            const uint16_t* depthFrameData = (const uint16_t*)depthFrame.get_data();
+            // NOTE(erd): this is fast enough in -O3 (1920x1080 -> ~15ms) but could probably be
+            // better
+            depthFrameScaled = make_unique<vector<uint16_t>>(depthWidth * depthHeight);
+            for (int y = 0; y < depthHeight; y++) {
+                for (int x = 0; x < depthWidth; x++) {
+                    auto px = (y * depthWidth) + x;
+                    uint16_t depthScaled = depthScaleMm * depthFrameData[px];
+                    (*depthFrameScaled)[px] = depthScaled;
+                }
+            }
+        }
         frameSet.mutex.lock();
         frameSet.colorFrame = frames.get_color_frame();
         frameSet.depthFrame = move(depthFrameScaled);
         frameSet.mutex.unlock();
-
 
         if (DEBUG) {
             auto stop = chrono::high_resolution_clock::now();
@@ -494,15 +511,12 @@ void frameLoop(rs2::pipeline pipeline, AtomicFrameSet& frameSet, promise<void>& 
 };
 
 // gives the pixel to mm conversion for the depth sensor
-float getDepthScale(rs2::device dev)
-{
+float getDepthScale(rs2::device dev) {
     // Go over the device's sensors
-    for (rs2::sensor& sensor : dev.query_sensors())
-    {
+    for (rs2::sensor& sensor : dev.query_sensors()) {
         // Check if the sensor if a depth sensor
-        if (rs2::depth_sensor dpt = sensor.as<rs2::depth_sensor>())
-        {
-            return dpt.get_depth_scale() * 1000.0; // rs2 gives pix2meters
+        if (rs2::depth_sensor dpt = sensor.as<rs2::depth_sensor>()) {
+            return dpt.get_depth_scale() * 1000.0;  // rs2 gives pix2meters
         }
     }
     throw std::runtime_error("Device does not have a depth sensor");
@@ -528,7 +542,7 @@ const PipelineWithProperties startPipeline(const int colorWidth, const int color
 
     float depthScaleMm = 0.0;
     if (!disableDepth) {
-	    depthScaleMm = getDepthScale(selected_device);
+        depthScaleMm = getDepthScale(selected_device);
     }
 
     rs2::config cfg;
