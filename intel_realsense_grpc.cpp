@@ -342,7 +342,7 @@ class CameraServiceImpl final : public CameraService::Service {
             }
             if (reqMimeType.compare("image/vnd.viam.dep") == 0) {
                 encodeDepthRAWToResponse(response, (const unsigned char*)latestDepthFrame->data(),
-                                         this->props.color.width, this->props.color.height);
+                                         this->props.depth.width, this->props.depth.height);
             } else {
                 encodeDepthPNGToResponse(response, (const unsigned char*)latestDepthFrame->data(),
                                          this->props.depth.width, this->props.depth.height);
