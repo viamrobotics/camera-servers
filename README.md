@@ -134,7 +134,7 @@ This will add the two cameras to your robot. They will have the names `intel:col
 
 ### Create camera to display point clouds
 
-Go to Config -> Components, and add the following camera model, `align_color_depth`. 
+Go to Config -> Components, and add the following camera model, `join_color_depth`. 
 ```
  {
         "output_image_type": "color",
