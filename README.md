@@ -140,12 +140,12 @@ Go to Config -> Components, and add the following camera model, `join_color_dept
         "output_image_type": "color",
     // you can get intrinsics by calling GetProperties on the intel gRPC camera server, too
         "intrinsic_parameters": {  // intrinsic parameters depend on the resolution of the camera
-            "height_px": 720,
-            "width_px": 1280,
-            "ppx": 648.1280,
-            "ppy": 367.736,
-            "fx": 900.538,
-            "fy": 900.818
+            "height_px": 480,
+            "width_px": 640,
+            "ppx": 320.215759,
+            "ppy": 239.543106,
+            "fx": 608.71105,
+            "fy": 609.39044
         },
         "color_camera_name": "intel:color",
         "depth_camera_name": "intel:depth"
