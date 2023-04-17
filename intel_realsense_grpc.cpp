@@ -444,20 +444,20 @@ class RobotServiceImpl final : public RobotService::Service {
 const rs2::align FRAME_ALIGNMENT = RS2_STREAM_COLOR;
 
 void frameLoop(rs2::pipeline pipeline, AtomicFrameSet& frameSet, promise<void>& ready,
-               DeviceProperties& context, float depthScaleMm) {
+               DeviceProperties& deviceProps, float depthScaleMm) {
     bool readyOnce = false;
     {
-        std::lock_guard<std::mutex> lock(context.mutex);
-        context.shouldRun = true;
-        context.isRunning = true;
+        std::lock_guard<std::mutex> lock(deviceProps.mutex);
+        deviceProps.shouldRun = true;
+        deviceProps.isRunning = true;
     }
     while (true) {
         {
-            std::lock_guard<std::mutex> lock(context.mutex);
-            if (!context.shouldRun) {
+            std::lock_guard<std::mutex> lock(deviceProps.mutex);
+            if (!deviceProps.shouldRun) {
                 pipeline.stop();
-                cout << "[frameLoop] context canceled, exiting thread" << endl;
-                context.isRunning = false;
+                cout << "[frameLoop] pipeline stopped exiting thread" << endl;
+                deviceProps.isRunning = false;
                 break;
             }
         }
@@ -485,7 +485,7 @@ void frameLoop(rs2::pipeline pipeline, AtomicFrameSet& frameSet, promise<void>& 
             cout << "[frameLoop] wait for frames: " << duration.count() << "ms\n";
         }
 
-        if (!context.disableColor && !context.disableDepth) {
+        if (!deviceProps.disableColor && !deviceProps.disableDepth) {
             auto start = chrono::high_resolution_clock::now();
 
             try {
@@ -504,7 +504,7 @@ void frameLoop(rs2::pipeline pipeline, AtomicFrameSet& frameSet, promise<void>& 
         }
         // scale every pixel value to be depth in units of mm
         unique_ptr<vector<uint16_t>> depthFrameScaled;
-        if (!context.disableDepth) {
+        if (!deviceProps.disableDepth) {
             auto depthFrame = frames.get_depth_frame();
             auto depthWidth = depthFrame.get_width();
             auto depthHeight = depthFrame.get_height();
