@@ -19,7 +19,6 @@ ifeq ($(UNAME), Darwin)
 	# There's a strange bug in the realsense pc file that adds this when it's not necessary at all
 	# when brew is in use. This may break something in the future.
    LIB_FLAGS := $(LIB_FLAGS:-L/usr/local/lib/x86_64-linux-gnu=)
-   include *.make
 endif
 
 GRPC_DIR = ./
