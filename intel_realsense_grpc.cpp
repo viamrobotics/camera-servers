@@ -41,6 +41,19 @@ using viam::robot::v1::RobotService;
 #define htonll(x) \
     ((1 == htonl(1)) ? (x) : ((uint64_t)htonl((x)&0xFFFFFFFF) << 32) | htonl((x) >> 32))
 
+struct DeviceProperties {
+    const int colorWidth;
+    const int colorHeight;
+    const bool disableColor;
+    const int depthWidth;
+    const int depthHeight;
+    const bool disableDepth;
+    bool shouldRun;
+    std::mutex mutex;
+
+    DeviceProperties(int colorWidth_, int colorHeight_, bool disableColor_, int depthWidth_, int depthHeight_, bool disableDepth_) : colorWidth(colorWidth_), colorHeight(colorHeight_), disableColor(disableColor_), depthWidth(depthWidth_), depthHeight(depthHeight_), disableDepth(disableDepth_), shouldRun(true) {}
+};
+
 struct CameraProperties {
     int width;
     int height;
@@ -68,6 +81,9 @@ struct AtomicFrameSet {
     rs2::frame colorFrame;
     shared_ptr<vector<uint16_t>> depthFrame;
 };
+
+// Global AtomicFrameSet
+AtomicFrameSet latestFrames;
 
 bool DEBUG = false;
 const uint32_t rgbaMagicNumber =
@@ -412,9 +428,16 @@ class RobotServiceImpl final : public RobotService::Service {
 const rs2::align FRAME_ALIGNMENT = RS2_STREAM_COLOR;
 
 void frameLoop(rs2::pipeline pipeline, AtomicFrameSet& frameSet, promise<void>& ready,
-               const bool disableColor, const bool disableDepth, float depthScaleMm) {
+               DeviceProperties& context, float depthScaleMm) {
     bool readyOnce = false;
     while (true) {
+	{
+            std::lock_guard<std::mutex> lock(context.mutex);
+            if (!context.shouldRun) {
+		cout << "[frameLoop] context canceled, exiting thread" << endl;
+                break;
+            }
+        }
         auto failureWait = 5ms;
 
         auto start = chrono::high_resolution_clock::now();
@@ -431,16 +454,15 @@ void frameLoop(rs2::pipeline pipeline, AtomicFrameSet& frameSet, promise<void>& 
                      << "ms" << endl;
             }
             this_thread::sleep_for(failureWait);
-            continue;
+	    continue;
         }
-
         if (DEBUG) {
             auto stop = chrono::high_resolution_clock::now();
             auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
             cout << "[frameLoop] wait for frames: " << duration.count() << "ms\n";
         }
 
-        if (!disableColor && !disableDepth) {
+        if (!context.disableColor && !context.disableDepth) {
             auto start = chrono::high_resolution_clock::now();
 
             try {
@@ -505,15 +527,14 @@ float getDepthScale(rs2::device dev) {
     throw std::runtime_error("Device does not have a depth sensor");
 }
 
-const PipelineWithProperties startPipeline(const int colorWidth, const int colorHeight,
-                                           const int depthWidth, const int depthHeight,
-                                           const bool disableDepth, const bool disableColor) {
+const PipelineWithProperties startPipeline(DeviceProperties& devProps) {
     rs2::context ctx;
     auto devices = ctx.query_devices();
     if (devices.size() == 0) {
         throw runtime_error("no device connected; please connect an Intel RealSense device");
     }
     rs2::device selected_device = devices.front();
+    selected_device.hardware_reset();
 
     auto serial = selected_device.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER);
     cout << "found device:\n";
@@ -524,19 +545,19 @@ const PipelineWithProperties startPipeline(const int colorWidth, const int color
     cout << "usb type:  " << selected_device.get_info(RS2_CAMERA_INFO_USB_TYPE_DESCRIPTOR) << "\n";
 
     float depthScaleMm = 0.0;
-    if (!disableDepth) {
+    if (!devProps.disableDepth) {
         depthScaleMm = getDepthScale(selected_device);
     }
 
     rs2::config cfg;
     cfg.enable_device(serial);
 
-    if (!disableColor) {
-        cfg.enable_stream(RS2_STREAM_COLOR, colorWidth, colorHeight, RS2_FORMAT_RGB8);
+    if (!devProps.disableColor) {
+        cfg.enable_stream(RS2_STREAM_COLOR, devProps.colorWidth, devProps.colorHeight, RS2_FORMAT_RGB8);
     }
 
-    if (!disableDepth) {
-        cfg.enable_stream(RS2_STREAM_DEPTH, depthWidth, depthHeight, RS2_FORMAT_Z16);
+    if (!devProps.disableDepth) {
+        cfg.enable_stream(RS2_STREAM_DEPTH, devProps.depthWidth, devProps.depthHeight, RS2_FORMAT_Z16);
     }
 
     rs2::pipeline pipeline(ctx);
@@ -559,27 +580,74 @@ const PipelineWithProperties startPipeline(const int colorWidth, const int color
 
     RealSenseProperties props;
     props.depthScaleMm = depthScaleMm;
-    if (!disableColor) {
+    if (!devProps.disableColor) {
         auto const stream = pipeline.get_active_profile()
                                 .get_stream(RS2_STREAM_COLOR)
                                 .as<rs2::video_stream_profile>();
         auto intrinsics = stream.get_intrinsics();
         props.color = fillProps(intrinsics, "brown_conrady");
     }
-    if (!disableDepth) {
+    if (!devProps.disableDepth) {
         auto const stream = pipeline.get_active_profile()
                                 .get_stream(RS2_STREAM_DEPTH)
                                 .as<rs2::video_stream_profile>();
         auto intrinsics = stream.get_intrinsics();
         props.depth = fillProps(intrinsics, "no_distortion");
-        if (!disableColor) {
+        if (!devProps.disableColor) {
             props.depth.width = props.color.width;
             props.depth.height = props.color.height;
         }
     }
 
+    cout << "pipeline started with:\n";
+    cout << "color_enabled:  " << boolalpha << !devProps.disableColor << "\n";
+    if (!devProps.disableColor) {
+        cout << "color_width:    " << pipeAndProps.properties.color.width << "\n";
+        cout << "color_height:   " << pipeAndProps.properties.color.height << "\n";
+    }
+    cout << "depth_enabled:  " << !devProps.disableDepth << endl;
+    if (!devProps.disableDepth) {
+        auto alignedText = "";
+        if (!devProps.disableColor) {
+            alignedText = " (aligned to color)";
+        }
+        cout << "depth_width:    " << pipeAndProps.properties.depth.width << alignedText << "\n";
+        cout << "depth_height:   " << pipeAndProps.properties.depth.height << alignedText << endl;
+    }
+
     return {pipeline : pipeline, properties : props};
 };
+
+void on_device_disconnect_or_reconnect(rs2::event_information& info, DeviceProperties& context) {
+    if (info.was_removed) {
+        std::cout << "Device was disconnected" << std::endl;
+	{
+	    std::lock_guard<std::mutex> lock(context.mutex);
+	    context.shouldRun = false;
+	}
+    } else if (info.was_added) {
+        std::cout << "Device was reconnected" << std::endl;
+        // Find and start the first available device
+	PipelineWithProperties pipeAndProps;
+	try {
+	    pipeAndProps = startPipeline(context);
+	} catch (const exception& e) {
+	    cout << "caught exception: \"" << e.what() << "\"" << endl;
+	    return;
+	}
+	// Start the camera thread
+	{
+	    std::lock_guard<std::mutex> lock(context.mutex);
+	    context.shouldRun = true;
+	}
+	promise<void> ready;
+	thread cameraThread(frameLoop, pipeAndProps.pipeline, ref(latestFrames), ref(ready),
+	    		context, pipeAndProps.properties.depthScaleMm);
+	cout << "waiting for camera frame loop thread to be ready..." << flush;
+	ready.get_future().wait();
+	cout << " ready!" << endl;
+    }
+}
 
 int main(const int argc, const char* argv[]) {
     fpng::fpng_init();
@@ -657,42 +725,36 @@ int main(const int argc, const char* argv[]) {
         return 1;
     }
 
+    // DeviceProperties context also holds a bool that can stop the thread if device gets disconnected
+    DeviceProperties context(colorWidth, colorHeight, disableColor, depthWidth, depthHeight, disableDepth);
+
+    // First start of Pipeline 
     PipelineWithProperties pipeAndProps;
     try {
-        pipeAndProps = startPipeline(colorWidth, colorHeight, depthWidth, depthHeight, disableDepth,
-                                     disableColor);
+        pipeAndProps = startPipeline(ref(context));
     } catch (const exception& e) {
         cout << "caught exception: \"" << e.what() << "\"" << endl;
         return 1;
     }
-
-    cout << "pipeline started with:\n";
-    cout << "color_enabled:  " << boolalpha << !disableColor << "\n";
-    if (!disableColor) {
-        cout << "color_width:    " << pipeAndProps.properties.color.width << "\n";
-        cout << "color_height:   " << pipeAndProps.properties.color.height << "\n";
-    }
-    cout << "depth_enabled:  " << !disableDepth << endl;
-    if (!disableDepth) {
-        auto alignedText = "";
-        if (!disableColor) {
-            alignedText = " (aligned to color)";
-        }
-        cout << "depth_width:    " << pipeAndProps.properties.depth.width << alignedText << "\n";
-        cout << "depth_height:   " << pipeAndProps.properties.depth.height << alignedText << endl;
-    }
-
-    AtomicFrameSet latestFrames;
+    // First start of camera thread
     promise<void> ready;
     thread cameraThread(frameLoop, pipeAndProps.pipeline, ref(latestFrames), ref(ready),
-                        disableColor, disableDepth, pipeAndProps.properties.depthScaleMm);
+                        ref(context), pipeAndProps.properties.depthScaleMm);
     cout << "waiting for camera frame loop thread to be ready..." << flush;
     ready.get_future().wait();
     cout << " ready!" << endl;
+    // start the callback function that will look for camera disconnects and reconnects.
+    // On disconnects it will stop the pipeline and thread, 
+    // on reconnects, it will restart the pipeline and thread.
+    rs2::context ctx;
+    ctx.set_devices_changed_callback([&](rs2::event_information& info) {
+        on_device_disconnect_or_reconnect(info, context);
+    });
 
+    // Start the gRPC server
     RobotServiceImpl robotService;
-    CameraServiceImpl cameraService(pipeAndProps.properties, latestFrames, disableColor,
-                                    disableDepth);
+    CameraServiceImpl cameraService(pipeAndProps.properties, latestFrames, context.disableColor,
+                                    context.disableDepth);
     const string address = "0.0.0.0:" + port;
     ServerBuilder builder;
     builder.AddListeningPort(address, grpc::InsecureServerCredentials());
