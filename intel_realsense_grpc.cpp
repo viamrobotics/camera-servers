@@ -6,7 +6,6 @@
 #include <grpcpp/server_context.h>
 #include <turbojpeg.h>
 
-#include <condition_variable>
 #include <future>
 #include <iostream>
 #include <librealsense2/rs.hpp>
