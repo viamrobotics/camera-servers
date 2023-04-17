@@ -667,6 +667,12 @@ void on_device_reconnect(rs2::event_information& info, DeviceProperties& context
         ready.get_future().wait();
         cout << " ready!" << endl;
         cameraThread.detach();
+    } else {
+        std::cout << "Device disconnected, stopping frame pipeline" << std::endl;
+        {
+            std::lock_guard<std::mutex> lock(context.mutex);
+            context.shouldRun = false;
+        }
     }
 };
 
@@ -748,21 +754,21 @@ int main(const int argc, const char* argv[]) {
 
     // DeviceProperties context also holds a bool that can stop the thread if device gets
     // disconnected
-    DeviceProperties context(colorWidth, colorHeight, disableColor, depthWidth, depthHeight,
-                             disableDepth);
+    DeviceProperties deviceProps(colorWidth, colorHeight, disableColor, depthWidth, depthHeight,
+                                 disableDepth);
 
     // First start of Pipeline
     rs2::pipeline pipe;
     RealSenseProperties props;
     try {
-        tie(pipe, props) = startPipeline(ref(context));
+        tie(pipe, props) = startPipeline(ref(deviceProps));
     } catch (const exception& e) {
         cout << "caught exception: \"" << e.what() << "\"" << endl;
         return 1;
     }
     // First start of camera thread
     promise<void> ready;
-    thread cameraThread(frameLoop, pipe, ref(latestFrames), ref(ready), ref(context),
+    thread cameraThread(frameLoop, pipe, ref(latestFrames), ref(ready), ref(deviceProps),
                         props.depthScaleMm);
     cout << "waiting for camera frame loop thread to be ready..." << flush;
     ready.get_future().wait();
@@ -771,12 +777,12 @@ int main(const int argc, const char* argv[]) {
     // on reconnects, it will close and restart the pipeline and thread.
     rs2::context ctx;
     ctx.set_devices_changed_callback(
-        [&](rs2::event_information& info) { on_device_reconnect(info, context, pipe); });
+        [&](rs2::event_information& info) { on_device_reconnect(info, deviceProps, pipe); });
 
     // Start the gRPC server
     RobotServiceImpl robotService;
-    CameraServiceImpl cameraService(props, latestFrames, context.disableColor,
-                                    context.disableDepth);
+    CameraServiceImpl cameraService(props, latestFrames, deviceProps.disableColor,
+                                    deviceProps.disableDepth);
     const string address = "0.0.0.0:" + port;
     ServerBuilder builder;
     builder.AddListeningPort(address, grpc::InsecureServerCredentials());
