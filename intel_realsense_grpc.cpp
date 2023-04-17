@@ -6,6 +6,7 @@
 #include <grpcpp/server_context.h>
 #include <turbojpeg.h>
 
+#include <condition_variable>
 #include <future>
 #include <iostream>
 #include <librealsense2/rs.hpp>
@@ -49,6 +50,7 @@ struct DeviceProperties {
     const int depthHeight;
     const bool disableDepth;
     bool shouldRun;
+    bool isRunning;
     std::mutex mutex;
 
     DeviceProperties(int colorWidth_, int colorHeight_, bool disableColor_, int depthWidth_,
@@ -59,7 +61,8 @@ struct DeviceProperties {
           depthWidth(depthWidth_),
           depthHeight(depthHeight_),
           disableDepth(disableDepth_),
-          shouldRun(true) {}
+          shouldRun(true),
+          isRunning(false) {}
 };
 
 struct CameraProperties {
@@ -444,11 +447,18 @@ const rs2::align FRAME_ALIGNMENT = RS2_STREAM_COLOR;
 void frameLoop(rs2::pipeline pipeline, AtomicFrameSet& frameSet, promise<void>& ready,
                DeviceProperties& context, float depthScaleMm) {
     bool readyOnce = false;
+    {
+        std::lock_guard<std::mutex> lock(context.mutex);
+        context.shouldRun = true;
+        context.isRunning = true;
+    }
     while (true) {
         {
             std::lock_guard<std::mutex> lock(context.mutex);
             if (!context.shouldRun) {
+                pipeline.stop();
                 cout << "[frameLoop] context canceled, exiting thread" << endl;
+                context.isRunning = false;
                 break;
             }
         }
@@ -541,14 +551,13 @@ float getDepthScale(rs2::device dev) {
     throw std::runtime_error("Device does not have a depth sensor");
 }
 
-const PipelineWithProperties startPipeline(DeviceProperties& devProps) {
+tuple<rs2::pipeline, RealSenseProperties> startPipeline(DeviceProperties& devProps) {
     rs2::context ctx;
     auto devices = ctx.query_devices();
     if (devices.size() == 0) {
         throw runtime_error("no device connected; please connect an Intel RealSense device");
     }
     rs2::device selected_device = devices.front();
-    selected_device.hardware_reset();
 
     auto serial = selected_device.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER);
     cout << "found device:\n";
@@ -618,8 +627,8 @@ const PipelineWithProperties startPipeline(DeviceProperties& devProps) {
     cout << "pipeline started with:\n";
     cout << "color_enabled:  " << boolalpha << !devProps.disableColor << "\n";
     if (!devProps.disableColor) {
-        cout << "color_width:    " << devProps.colorWidth << "\n";
-        cout << "color_height:   " << devProps.colorHeight << "\n";
+        cout << "color_width:    " << props.color.width << "\n";
+        cout << "color_height:   " << props.color.height << "\n";
     }
     cout << "depth_enabled:  " << !devProps.disableDepth << endl;
     if (!devProps.disableDepth) {
@@ -627,43 +636,40 @@ const PipelineWithProperties startPipeline(DeviceProperties& devProps) {
         if (!devProps.disableColor) {
             alignedText = " (aligned to color)";
         }
-        cout << "depth_width:    " << devProps.depthWidth << alignedText << "\n";
-        cout << "depth_height:   " << devProps.depthHeight << alignedText << endl;
+        cout << "depth_width:    " << props.depth.width << alignedText << "\n";
+        cout << "depth_height:   " << props.depth.height << alignedText << endl;
     }
 
-    return {pipeline : pipeline, properties : props};
+    return make_tuple(pipeline, props);
 };
 
-void on_device_disconnect_or_reconnect(rs2::event_information& info, DeviceProperties& context) {
-    if (info.was_removed(info.get_new_devices().front())) {
-        std::cout << "Device was disconnected" << std::endl;
+void on_device_reconnect(rs2::event_information& info, DeviceProperties& context,
+                         rs2::pipeline pipeline) {
+    if (info.was_added(info.get_new_devices().front())) {
+        std::cout << "Device was reconnected, restarting pipeline" << std::endl;
         {
             std::lock_guard<std::mutex> lock(context.mutex);
             context.shouldRun = false;
         }
-    } else if (info.was_added(info.get_new_devices().front())) {
-        std::cout << "Device was reconnected" << std::endl;
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         // Find and start the first available device
-        PipelineWithProperties pipeAndProps;
+        RealSenseProperties props;
         try {
-            pipeAndProps = startPipeline(context);
+            tie(pipeline, props) = startPipeline(context);
         } catch (const exception& e) {
             cout << "caught exception: \"" << e.what() << "\"" << endl;
             return;
         }
         // Start the camera thread
-        {
-            std::lock_guard<std::mutex> lock(context.mutex);
-            context.shouldRun = true;
-        }
         promise<void> ready;
-        thread cameraThread(frameLoop, pipeAndProps.pipeline, ref(latestFrames), ref(ready),
-                            ref(context), pipeAndProps.properties.depthScaleMm);
+        thread cameraThread(frameLoop, pipeline, ref(latestFrames), ref(ready), ref(context),
+                            props.depthScaleMm);
         cout << "waiting for camera frame loop thread to be ready..." << flush;
         ready.get_future().wait();
         cout << " ready!" << endl;
+        cameraThread.detach();
     }
-}
+};
 
 int main(const int argc, const char* argv[]) {
     fpng::fpng_init();
@@ -747,30 +753,30 @@ int main(const int argc, const char* argv[]) {
                              disableDepth);
 
     // First start of Pipeline
-    PipelineWithProperties pipeAndProps;
+    rs2::pipeline pipe;
+    RealSenseProperties props;
     try {
-        pipeAndProps = startPipeline(ref(context));
+        tie(pipe, props) = startPipeline(ref(context));
     } catch (const exception& e) {
         cout << "caught exception: \"" << e.what() << "\"" << endl;
         return 1;
     }
     // First start of camera thread
     promise<void> ready;
-    thread cameraThread(frameLoop, pipeAndProps.pipeline, ref(latestFrames), ref(ready),
-                        ref(context), pipeAndProps.properties.depthScaleMm);
+    thread cameraThread(frameLoop, pipe, ref(latestFrames), ref(ready), ref(context),
+                        props.depthScaleMm);
     cout << "waiting for camera frame loop thread to be ready..." << flush;
     ready.get_future().wait();
     cout << " ready!" << endl;
     // start the callback function that will look for camera disconnects and reconnects.
-    // On disconnects it will stop the pipeline and thread,
-    // on reconnects, it will restart the pipeline and thread.
+    // on reconnects, it will close and restart the pipeline and thread.
     rs2::context ctx;
     ctx.set_devices_changed_callback(
-        [&](rs2::event_information& info) { on_device_disconnect_or_reconnect(info, context); });
+        [&](rs2::event_information& info) { on_device_reconnect(info, context, pipe); });
 
     // Start the gRPC server
     RobotServiceImpl robotService;
-    CameraServiceImpl cameraService(pipeAndProps.properties, latestFrames, context.disableColor,
+    CameraServiceImpl cameraService(props, latestFrames, context.disableColor,
                                     context.disableDepth);
     const string address = "0.0.0.0:" + port;
     ServerBuilder builder;
