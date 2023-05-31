@@ -21,6 +21,7 @@
 #include "robot/v1/robot.pb.h"
 #include "third_party/fpng.h"
 #include "third_party/lodepng.h"
+#include "third_party/endian.h"
 
 using namespace std;
 using grpc::Server;
@@ -298,7 +299,12 @@ tuple<unsigned char*, size_t, bool> encodeDepthRAW(const unsigned char* data, co
     offset += depthWidthByteCount;
     std::memcpy(rawBuf + offset, &heightToEncode, depthHeightByteCount);
     offset += depthHeightByteCount;
-    std::memcpy(rawBuf + offset, data, pixelByteCount);
+    int pixelOffset = 0;
+    for (int i = 0; i < width * height; i++) {
+        MEMCPY_BE(rawBuf + offset, data + pixelOffset, 2); // func from endian.h for big-endian buffer copy
+        pixelOffset += 2;
+        offset += 2;
+    }
 
     if (DEBUG) {
         auto stop = chrono::high_resolution_clock::now();
