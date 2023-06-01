@@ -43,7 +43,6 @@ GEN_SOURCES += $(GRPC_DIR)/component/camera/v1/camera.grpc.pb.cc $(GRPC_DIR)/com
 GEN_SOURCES += $(GRPC_DIR)/google/api/annotations.pb.cc $(GRPC_DIR)/google/api/httpbody.pb.cc
 GEN_SOURCES += $(GRPC_DIR)/google/api/http.pb.cc
 THIRD_PARTY_SOURCES = third_party/fpng.cpp third_party/lodepng.cpp
-C_SOURCES = third_party/endian.c
 
 default: intelrealgrpcserver-release-opt
 
@@ -72,12 +71,12 @@ $(TOOL_BIN)/buf:
 $(TOOL_BIN)/protoc-gen-grpc-cpp:
 	ln -sf `which grpc_cpp_plugin` $(TOOL_BIN)/protoc-gen-grpc-cpp
 
-SERVER_TARGETS = $(C_SOURCES) $(THIRD_PARTY_SOURCES) $(GEN_SOURCES) intel_realsense_grpc.cpp
+SERVER_SOURCES = $(THIRD_PARTY_SOURCES) $(GEN_SOURCES) intel_realsense_grpc.cpp
 CPP_COMPILER = g++
-CPP_FLAGS = -std=c++17 -o intelrealgrpcserver -I$(GRPC_DIR) intel_realsense_grpc.cpp $(C_SOURCES) $(THIRD_PARTY_SOURCES) $(GEN_SOURCES) $(LIB_FLAGS) $(GCC_FLAGS)
+CPP_FLAGS = -std=c++17 -I$(GRPC_DIR) $(LIB_FLAGS) $(GCC_FLAGS)
 
-intelrealgrpcserver: $(SERVER_TARGETS)
-	$(CPP_COMPILER) $(CPP_FLAGS_EXTRA) $(CPP_FLAGS)
+intelrealgrpcserver: $(SERVER_SOURCES)
+	$(CPP_COMPILER) -o intelrealgrpcserver $(SERVER_SOURCES) $(CPP_FLAGS) $(CPP_FLAGS_EXTRA) 
 
 intelrealgrpcserver-debug: CPP_FLAGS_EXTRA = -pg
 intelrealgrpcserver-debug: intelrealgrpcserver

@@ -21,7 +21,6 @@
 #include "robot/v1/robot.pb.h"
 #include "third_party/fpng.h"
 #include "third_party/lodepng.h"
-#include "third_party/endian.h"
 
 using namespace std;
 using grpc::Server;
@@ -301,7 +300,10 @@ tuple<unsigned char*, size_t, bool> encodeDepthRAW(const unsigned char* data, co
     offset += depthHeightByteCount;
     int pixelOffset = 0;
     for (int i = 0; i < width * height; i++) {
-        MEMCPY_BE(rawBuf + offset, data + pixelOffset, 2); // func from endian.h for big-endian buffer copy
+	uint16_t pix;
+	std::memcpy(&pix, data + pixelOffset, 2);
+	uint16_t pixEncode = htons(pix); // make sure the pixel values are big-endian 
+	std::memcpy(rawBuf + offset, &pixEncode, 2); 
         pixelOffset += 2;
         offset += 2;
     }
