@@ -248,8 +248,21 @@ tuple<unsigned char*, size_t, bool> encodeDepthPNG(const unsigned char* data, co
 
     unsigned char* encoded = 0;
     size_t encoded_size = 0;
+    // convert data to guarantee big-endian
+    size_t pixelByteCount = 2 * width * height;
+    unsigned char* rawBuf = new unsigned char[pixelByteCount];
+    int offset = 0;
+    int pixelOffset = 0;
+    for (int i = 0; i < width * height; i++) {
+	uint16_t pix;
+	std::memcpy(&pix, data + pixelOffset, 2);
+	uint16_t pixEncode = htons(pix); // make sure the pixel values are big-endian 
+	std::memcpy(rawBuf + offset, &pixEncode, 2); 
+        pixelOffset += 2;
+        offset += 2;
+    }
     unsigned result =
-        lodepng_encode_memory(&encoded, &encoded_size, data, width, height, LCT_GREY, 16);
+        lodepng_encode_memory(&encoded, &encoded_size, rawBuf, width, height, LCT_GREY, 16);
     if (result != 0) {
         cerr << "[GetImage]  failed to encode depth PNG" << endl;
         return {encoded, encoded_size, false};
