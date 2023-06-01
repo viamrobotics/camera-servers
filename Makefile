@@ -71,12 +71,12 @@ $(TOOL_BIN)/buf:
 $(TOOL_BIN)/protoc-gen-grpc-cpp:
 	ln -sf `which grpc_cpp_plugin` $(TOOL_BIN)/protoc-gen-grpc-cpp
 
-SERVER_TARGETS = $(THIRD_PARTY_SOURCES) $(GEN_SOURCES) intel_realsense_grpc.cpp
+SERVER_SOURCES = $(THIRD_PARTY_SOURCES) $(GEN_SOURCES) intel_realsense_grpc.cpp
 CPP_COMPILER = g++
-CPP_FLAGS = -std=c++17 -o intelrealgrpcserver -I$(GRPC_DIR) intel_realsense_grpc.cpp $(THIRD_PARTY_SOURCES) $(GEN_SOURCES) $(LIB_FLAGS) $(GCC_FLAGS)
+CPP_FLAGS = -std=c++17 -I$(GRPC_DIR) $(LIB_FLAGS) $(GCC_FLAGS)
 
-intelrealgrpcserver: $(SERVER_TARGETS)
-	$(CPP_COMPILER) $(CPP_FLAGS_EXTRA) $(CPP_FLAGS)
+intelrealgrpcserver: $(SERVER_SOURCES)
+	$(CPP_COMPILER) -o intelrealgrpcserver $(SERVER_SOURCES) $(CPP_FLAGS) $(CPP_FLAGS_EXTRA) 
 
 intelrealgrpcserver-debug: CPP_FLAGS_EXTRA = -pg
 intelrealgrpcserver-debug: intelrealgrpcserver
