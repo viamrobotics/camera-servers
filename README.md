@@ -9,6 +9,10 @@ For example:
 sudo curl -o /usr/local/bin/intelrealgrpcserver http://packages.viam.com/apps/camera-servers/intelrealgrpcserver-latest-aarch64.AppImage
 
 sudo chmod a+rx /usr/local/bin/intelrealgrpcserver
+
+# If you want little-endian encoded depth maps, you can use the following release instead:
+
+sudo curl -o /usr/local/bin/intelrealgrpcserver http://packages.viam.com/apps/camera-servers/intelrealgrpcserver-a494eab-aarch64.AppImage
 ```
 
 For MacOS (M1 macs), you can use our homebrew formula from the Viam tap:
