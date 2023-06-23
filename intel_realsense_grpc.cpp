@@ -734,7 +734,6 @@ int main(const int argc, const char* argv[]) {
         auto argVal = string(argv[i]);
         if (string("--disable-depth").compare(argVal) == 0) {
             disableDepth = true;
-
         } else if (string("--disable-color").compare(argVal) == 0) {
             disableColor = true;
         } else if (string("--disable-motion").compare(argVal) == 0) {
