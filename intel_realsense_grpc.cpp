@@ -26,6 +26,8 @@ using namespace std;
 using grpc::Server;
 using grpc::ServerBuilder;
 using grpc::ServerContext;
+using viam::common::v1::DoCommandRequest;
+using viam::common::v1::DoCommandResponse;
 using viam::common::v1::ResourceName;
 using viam::component::camera::v1::CameraService;
 using viam::component::camera::v1::DistortionParameters;
@@ -60,6 +62,7 @@ struct RealSenseProperties {
 
 struct PipelineWithProperties {
     rs2::pipeline pipeline;
+    rs2::pipeline motionPipeline;
     RealSenseProperties properties;
 };
 
@@ -67,6 +70,12 @@ struct AtomicFrameSet {
     std::mutex mutex;
     rs2::frame colorFrame;
     shared_ptr<vector<uint16_t>> depthFrame;
+};
+
+struct MotionData {
+    std::mutex mutex;
+    rs2_vector gryo_data;
+    rs2_vector accel_data;
 };
 
 bool DEBUG = false;
@@ -117,7 +126,7 @@ grpc::Status encodeColorPNGToResponse(GetImageResponse* response, const uint8_t*
 }
 
 tuple<unsigned char*, long unsigned int, bool> encodeJPEG(const unsigned char* data,
-                                                          const int width, const int height) {
+                                  const int width, const int height) {
     std::chrono::time_point<std::chrono::high_resolution_clock> start;
     if (DEBUG) {
         start = chrono::high_resolution_clock::now();
@@ -156,7 +165,7 @@ grpc::Status encodeJPEGToResponse(GetImageResponse* response, const unsigned cha
 }
 
 tuple<unsigned char*, size_t, bool> encodeColorRAW(const unsigned char* data, const uint32_t width,
-                                                   const uint32_t height) {
+                                                    const uint32_t height) {
     std::chrono::time_point<std::chrono::high_resolution_clock> start;
     if (DEBUG) {
         start = chrono::high_resolution_clock::now();
@@ -208,7 +217,7 @@ grpc::Status encodeColorRAWToResponse(GetImageResponse* response, const unsigned
 
 // DEPTH responses
 tuple<unsigned char*, size_t, bool> encodeDepthPNG(const unsigned char* data, const uint width,
-                                                   const uint height) {
+                                                    const uint height) {
     std::chrono::time_point<std::chrono::high_resolution_clock> start;
     if (DEBUG) {
         start = chrono::high_resolution_clock::now();
@@ -245,7 +254,7 @@ grpc::Status encodeDepthPNGToResponse(GetImageResponse* response, const unsigned
 }
 
 tuple<unsigned char*, size_t, bool> encodeDepthRAW(const unsigned char* data, const uint64_t width,
-                                                   const uint64_t height) {
+                                                    const uint64_t height) {
     std::chrono::time_point<std::chrono::high_resolution_clock> start;
     if (DEBUG) {
         start = chrono::high_resolution_clock::now();
@@ -279,7 +288,7 @@ tuple<unsigned char*, size_t, bool> encodeDepthRAW(const unsigned char* data, co
 
 grpc::Status encodeDepthRAWToResponse(GetImageResponse* response, const unsigned char* data,
                                       const uint width, const uint height) {
-    const auto& [encoded, encodedSize, ok] = encodeDepthRAW(data, width, height);
+    const auto &[encoded, encodedSize, ok] = encodeDepthRAW(data, width, height);
     if (!ok) {
         std::free(encoded);
         return grpc::Status(grpc::StatusCode::INTERNAL, "failed to encode depth RAW");
@@ -292,17 +301,19 @@ grpc::Status encodeDepthRAWToResponse(GetImageResponse* response, const unsigned
 
 // CAMERA service
 class CameraServiceImpl final : public CameraService::Service {
-   private:
+private:
     RealSenseProperties props;
     AtomicFrameSet& frameSet;
+    MotionData& motionData;
     const bool disableColor;
     const bool disableDepth;
 
-   public:
-    CameraServiceImpl(RealSenseProperties props, AtomicFrameSet& frameSet, const bool disableColor,
+public:
+    CameraServiceImpl(RealSenseProperties props, AtomicFrameSet& frameSet, MotionData& motionData, const bool disableColor,
                       const bool disableDepth)
         : props(props),
           frameSet(frameSet),
+          motionData(motionData),
           disableColor(disableColor),
           disableDepth(disableDepth){};
 
@@ -387,10 +398,27 @@ class CameraServiceImpl final : public CameraService::Service {
 
         return grpc::Status::OK;
     }
+
+    ::grpc::Status DoCommand(ServerContext *context, const DoCommandRequest *request,
+                             DoCommandResponse *response) override
+    {
+        cout << "making do command" << endl;
+        google::protobuf::Struct *motion;
+        google::protobuf::Struct *result = response->mutable_result();
+        motion->mutable_fields()->operator[]("acc_x").set_number_value(motionData.accel_data.x);
+        motion->mutable_fields()->operator[]("acc_y").set_number_value(motionData.accel_data.y);
+        motion->mutable_fields()->operator[]("acc_z").set_number_value(motionData.accel_data.z);
+
+        motion->mutable_fields()->operator[]("gryo_x").set_number_value(motionData.gryo_data.x);
+        motion->mutable_fields()->operator[]("gryo_y").set_number_value(motionData.gryo_data.y);
+        motion->mutable_fields()->operator[]("gryo_z").set_number_value(motionData.gryo_data.z);
+
+        return grpc::Status::OK;
+    }
 };
 
-class RobotServiceImpl final : public RobotService::Service {
-   public:
+class RobotServiceImpl final : public RobotService::Service { 
+    public:
     grpc::Status ResourceNames(ServerContext* context, const ResourceNamesRequest* request,
                                ResourceNamesResponse* response) override {
         ResourceName* colorName = response->add_resources();
@@ -410,7 +438,8 @@ class RobotServiceImpl final : public RobotService::Service {
 
 // align to the color camera's origin when color and depth enabled
 const rs2::align FRAME_ALIGNMENT = RS2_STREAM_COLOR;
-
+// void frameLoop(rs2::pipeline pipeline, AtomicFrameSet& frameSet, MotionData& motionData, promise<void>& ready,
+//                const bool disableColor, const bool disableDepth, const bool disableMotion, float depthScaleMm) {
 void frameLoop(rs2::pipeline pipeline, AtomicFrameSet& frameSet, promise<void>& ready,
                const bool disableColor, const bool disableDepth, float depthScaleMm) {
     bool readyOnce = false;
@@ -420,19 +449,51 @@ void frameLoop(rs2::pipeline pipeline, AtomicFrameSet& frameSet, promise<void>& 
         auto start = chrono::high_resolution_clock::now();
 
         rs2::frameset frames;
-        const uint timeoutMillis = 2000;
+        const uint timeoutMillis = 10000;
         /*
             D435 1920x1080 RGB + Depth ~20ms on a Raspberry Pi 4 Model B
         */
-        bool succ = pipeline.try_wait_for_frames(&frames, timeoutMillis);
+        //cout << "hello!!!!!" << endl;
+        // bool succ = pipeline.try_wait_for_frames(&frames, timeoutMillis);
+        bool succ = pipeline.poll_for_frames(&frames);
         if (!succ) {
-            if (DEBUG) {
-                cerr << "[frameLoop] could not get frames from realsense after " << timeoutMillis
-                     << "ms" << endl;
-            }
+            // if (DEBUG) {
+            //     cerr << "[frameLoop] could not get frames from realsense after " << timeoutMillis
+            //          << "ms" << endl;
+            // }
             this_thread::sleep_for(failureWait);
             continue;
         }
+
+        cout << "# of Frames: " << frames.size() << endl << endl;
+
+        // for (const auto &f : frames) {
+        //     if (f.is<rs2::motion_frame>()) {
+        //         auto motion = f.as<rs2::motion_frame>();
+
+        //         MotionData motionData;
+
+        //         if (motion && motion.get_profile().stream_type() == RS2_STREAM_GYRO && motion.get_profile().format() == RS2_FORMAT_MOTION_XYZ32F) {
+        //             double ts = motion.get_timestamp();
+        //             rs2_vector gyro_data = motion.get_motion_data();
+
+        //             motionData.mutex.lock();
+        //             motionData.gryo_data = gyro_data;
+        //             motionData.mutex.unlock();
+        //             cout << "Gyro data: " << gyro_data << endl;
+        //         }
+
+        //         if (motion && motion.get_profile().stream_type() == RS2_STREAM_ACCEL && motion.get_profile().format() == RS2_FORMAT_MOTION_XYZ32F) {
+        //             double ts = motion.get_timestamp();
+        //             rs2_vector accel_data = motion.get_motion_data();
+
+        //             motionData.mutex.lock();
+        //             motionData.accel_data = accel_data;
+        //             motionData.mutex.unlock();
+        //             cout << "accel data: " << accel_data << endl;
+        //         }
+        //     }
+        // }
 
         if (DEBUG) {
             auto stop = chrono::high_resolution_clock::now();
@@ -493,6 +554,60 @@ void frameLoop(rs2::pipeline pipeline, AtomicFrameSet& frameSet, promise<void>& 
     }
 };
 
+
+
+void motionLoop(rs2::pipeline pipeline, MotionData &motionData, promise<void> &ready)
+{
+    bool readyOnce = false;
+    while (true)
+    {
+        auto failureWait = 5ms;
+        const uint timeoutMillis = 2000;
+
+        auto start = chrono::high_resolution_clock::now();
+        
+        rs2::frameset frameset;         
+        bool succ = pipeline.try_wait_for_frames(&frameset, timeoutMillis);
+        if (!succ)
+        {
+            if (DEBUG)
+            {
+                cerr << "[frameLoop] could not get frames from realsense after " << timeoutMillis
+                     << "ms" << endl;
+            }
+            this_thread::sleep_for(failureWait);
+            continue;
+        }
+
+        auto motion = frameset.as<rs2::motion_frame>();
+
+        if (motion && motion.get_profile().stream_type() == RS2_STREAM_GYRO && motion.get_profile().format() == RS2_FORMAT_MOTION_XYZ32F) {
+            double ts = motion.get_timestamp();
+            rs2_vector gyro_data = motion.get_motion_data();
+
+            motionData.mutex.lock();
+            motionData.gryo_data = gyro_data;
+            motionData.mutex.unlock();
+            cout << "Gyro data: " << gyro_data << endl;
+        }
+
+        if (motion && motion.get_profile().stream_type() == RS2_STREAM_ACCEL && motion.get_profile().format() == RS2_FORMAT_MOTION_XYZ32F) {
+            double ts = motion.get_timestamp();
+            rs2_vector accel_data = motion.get_motion_data();
+
+            motionData.mutex.lock();
+            motionData.accel_data = accel_data;
+            motionData.mutex.unlock();
+            cout << "accel data: " << accel_data << endl;
+        }
+
+        if (!readyOnce){
+            readyOnce = true;
+            ready.set_value();
+        }
+    }
+};
+
 // gives the pixel to mm conversion for the depth sensor
 float getDepthScale(rs2::device dev) {
     // Go over the device's sensors
@@ -507,7 +622,7 @@ float getDepthScale(rs2::device dev) {
 
 const PipelineWithProperties startPipeline(const int colorWidth, const int colorHeight,
                                            const int depthWidth, const int depthHeight,
-                                           const bool disableDepth, const bool disableColor) {
+                                           const bool disableDepth, const bool disableColor, const bool disableMotion) {
     rs2::context ctx;
     auto devices = ctx.query_devices();
     if (devices.size() == 0) {
@@ -539,8 +654,32 @@ const PipelineWithProperties startPipeline(const int colorWidth, const int color
         cfg.enable_stream(RS2_STREAM_DEPTH, depthWidth, depthHeight, RS2_FORMAT_Z16);
     }
 
+    rs2::config motionCfg;
+    rs2::pipeline motionPipeline(ctx);
+    if (!disableMotion)
+    {
+        cout << "enable motions streams" << endl;
+        cfg.enable_stream(RS2_STREAM_ACCEL, RS2_FORMAT_MOTION_XYZ32F);
+        cfg.enable_stream(RS2_STREAM_GYRO, RS2_FORMAT_MOTION_XYZ32F);
+
+        //motionPipeline.start(motionCfg, [&](rs2::frame frame){cout<< "got motion frame" << endl;});
+    }
+
+    // rs2::pipeline pipeline(ctx);
+    // pipeline.start(cfg);
+    //rs2::pipeline motionPipeline(ctx);
+    //motionPipeline.start(motionCfg, [&](rs2::frame frame){});
+
     rs2::pipeline pipeline(ctx);
-    pipeline.start(cfg);
+    //pipeline.start(cfg);
+    pipeline.start(cfg, [&](rs2::frame frame){
+        cout << "got frame: ";
+        if (frame.as<rs2::motion_frame>()) {
+            cout << "motion" << endl;
+        } else {
+            cout << "camera" << endl;
+        }
+    });
 
     auto fillProps = [](auto intrinsics, string distortionModel) -> CameraProperties {
         CameraProperties camProps;
@@ -578,7 +717,7 @@ const PipelineWithProperties startPipeline(const int colorWidth, const int color
         }
     }
 
-    return {pipeline : pipeline, properties : props};
+    return {pipeline : pipeline, motionPipeline: motionPipeline, properties : props};
 };
 
 int main(const int argc, const char* argv[]) {
@@ -588,17 +727,38 @@ int main(const int argc, const char* argv[]) {
     if (argc == 2 && string("--help").compare(string(argv[1])) == 0) {
         cout << "usage: intelrealgrpcserver [port_number] [color_width] [color_height] "
                 "[depth_width] [depth_height]"
-                "[--disable-depth] [--disable-color]"
+                "[--disable-depth] [--disable-color] [--disable-motion]"
              << endl;
         return 0;
     }
+    bool disableMotion = false;
+    bool disableDepth = false;
+    bool disableColor = false;
     string port = "8085";
     int colorWidth = 0;
     int colorHeight = 0;
     int depthWidth = 0;
     int depthHeight = 0;
     if (argc > 1) {
-        port = argv[1];
+        string t = argv[1];
+        //port = argv[1];
+        if (t == "0") {
+            disableMotion = true;
+            cout << "motion has been disabled" << endl;
+        }
+        if (t == "1") {
+            disableColor = true;
+            disableDepth = true;
+            cout << "camera has been disabled" << endl;
+        }
+        if (t == "2") {
+            disableColor = true;
+            cout << "color has been disabled" << endl;
+        }
+        if (t == "3") {
+            disableDepth = true;
+            cout << "depth has been disabled" << endl;
+        }
     }
 
     auto parseIntArg = [argc, argv](const int pos, const string& name) -> tuple<int, bool> {
@@ -639,28 +799,29 @@ int main(const int argc, const char* argv[]) {
         cout << "note: will pick any suitable depth_width and depth_height" << endl;
     }
 
-    bool disableDepth = false;
-    bool disableColor = false;
     for (int i = 6; i < argc; i++) {
         auto argVal = string(argv[i]);
         if (string("--disable-depth").compare(argVal) == 0) {
             disableDepth = true;
+            cerr << "depth has been disabled" << endl;
         } else if (string("--disable-color").compare(argVal) == 0) {
             disableColor = true;
+            cerr << "color has been disabled" << endl;
         } else if (string("--debug").compare(argVal) == 0) {
             DEBUG = true;
         }
     }
+    DEBUG = true;
 
-    if (disableColor && disableDepth) {
-        cerr << "cannot disable both color and depth" << endl;
-        return 1;
-    }
+    // if (disableColor && disableDepth) {
+    //     cerr << "cannot disable both color and depth" << endl;
+    //     return 1;
+    // }
 
     PipelineWithProperties pipeAndProps;
     try {
         pipeAndProps = startPipeline(colorWidth, colorHeight, depthWidth, depthHeight, disableDepth,
-                                     disableColor);
+                                     disableColor, disableMotion);
     } catch (const exception& e) {
         cout << "caught exception: \"" << e.what() << "\"" << endl;
         return 1;
@@ -681,17 +842,27 @@ int main(const int argc, const char* argv[]) {
         cout << "depth_width:    " << pipeAndProps.properties.depth.width << alignedText << "\n";
         cout << "depth_height:   " << pipeAndProps.properties.depth.height << alignedText << endl;
     }
+    cout << "motion_enabled:  " << !disableMotion << endl;
 
     AtomicFrameSet latestFrames;
-    promise<void> ready;
-    thread cameraThread(frameLoop, pipeAndProps.pipeline, ref(latestFrames), ref(ready),
-                        disableColor, disableDepth, pipeAndProps.properties.depthScaleMm);
-    cout << "waiting for camera frame loop thread to be ready..." << flush;
-    ready.get_future().wait();
-    cout << " ready!" << endl;
+    MotionData latestMotionData;
+    // promise<void> ready;
+    // // thread cameraThread(frameLoop, pipeAndProps.pipeline, ref(latestFrames), ref(latestMotionData), ref(ready),
+    // //                     disableColor, disableDepth, pipeAndProps.properties.depthScaleMm);
+    // thread cameraThread(frameLoop, pipeAndProps.pipeline, ref(latestFrames), ref(ready),
+    //                     disableColor, disableDepth, pipeAndProps.properties.depthScaleMm);
+    // cout << "waiting for camera frame loop thread to be ready..." << flush;
+    // ready.get_future().wait();
+    // cout << " ready!" << endl;
+
+    // promise<void> ready_motion;
+    // //thread motionThread(motionLoop, pipeAndProps.pipeline, ref(latestMotionData), ref(ready_motion));
+    // cout << "waiting for motion loop thread to be ready..." << flush;
+    // ready_motion.get_future().wait();
+    // cout << " motion ready!" << endl;
 
     RobotServiceImpl robotService;
-    CameraServiceImpl cameraService(pipeAndProps.properties, latestFrames, disableColor,
+    CameraServiceImpl cameraService(pipeAndProps.properties, latestFrames, latestMotionData, disableColor,
                                     disableDepth);
     const string address = "0.0.0.0:" + port;
     ServerBuilder builder;
