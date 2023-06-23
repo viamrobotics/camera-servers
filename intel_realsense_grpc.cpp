@@ -126,7 +126,7 @@ grpc::Status encodeColorPNGToResponse(GetImageResponse* response, const uint8_t*
 }
 
 tuple<unsigned char*, long unsigned int, bool> encodeJPEG(const unsigned char* data,
-                                  const int width, const int height) {
+                                                          const int width, const int height) {
     std::chrono::time_point<std::chrono::high_resolution_clock> start;
     if (DEBUG) {
         start = chrono::high_resolution_clock::now();
@@ -165,7 +165,7 @@ grpc::Status encodeJPEGToResponse(GetImageResponse* response, const unsigned cha
 }
 
 tuple<unsigned char*, size_t, bool> encodeColorRAW(const unsigned char* data, const uint32_t width,
-                                                    const uint32_t height) {
+                                                   const uint32_t height) {
     std::chrono::time_point<std::chrono::high_resolution_clock> start;
     if (DEBUG) {
         start = chrono::high_resolution_clock::now();
@@ -217,7 +217,7 @@ grpc::Status encodeColorRAWToResponse(GetImageResponse* response, const unsigned
 
 // DEPTH responses
 tuple<unsigned char*, size_t, bool> encodeDepthPNG(const unsigned char* data, const uint width,
-                                                    const uint height) {
+                                                   const uint height) {
     std::chrono::time_point<std::chrono::high_resolution_clock> start;
     if (DEBUG) {
         start = chrono::high_resolution_clock::now();
@@ -254,7 +254,7 @@ grpc::Status encodeDepthPNGToResponse(GetImageResponse* response, const unsigned
 }
 
 tuple<unsigned char*, size_t, bool> encodeDepthRAW(const unsigned char* data, const uint64_t width,
-                                                    const uint64_t height) {
+                                                   const uint64_t height) {
     std::chrono::time_point<std::chrono::high_resolution_clock> start;
     if (DEBUG) {
         start = chrono::high_resolution_clock::now();
@@ -288,7 +288,7 @@ tuple<unsigned char*, size_t, bool> encodeDepthRAW(const unsigned char* data, co
 
 grpc::Status encodeDepthRAWToResponse(GetImageResponse* response, const unsigned char* data,
                                       const uint width, const uint height) {
-    const auto &[encoded, encodedSize, ok] = encodeDepthRAW(data, width, height);
+    const auto& [encoded, encodedSize, ok] = encodeDepthRAW(data, width, height);
     if (!ok) {
         std::free(encoded);
         return grpc::Status(grpc::StatusCode::INTERNAL, "failed to encode depth RAW");
@@ -301,14 +301,14 @@ grpc::Status encodeDepthRAWToResponse(GetImageResponse* response, const unsigned
 
 // CAMERA service
 class CameraServiceImpl final : public CameraService::Service {
-private:
+   private:
     RealSenseProperties props;
     AtomicFrameSet& frameSet;
     MotionData& motionData;
     const bool disableColor;
     const bool disableDepth;
 
-public:
+   public:
     CameraServiceImpl(RealSenseProperties props, AtomicFrameSet& frameSet, MotionData& motionData, const bool disableColor,
                       const bool disableDepth)
         : props(props),
@@ -417,8 +417,8 @@ public:
     }
 };
 
-class RobotServiceImpl final : public RobotService::Service { 
-    public:
+class RobotServiceImpl final : public RobotService::Service {
+   public:
     grpc::Status ResourceNames(ServerContext* context, const ResourceNamesRequest* request,
                                ResourceNamesResponse* response) override {
         ResourceName* colorName = response->add_resources();
@@ -680,7 +680,6 @@ int main(const int argc, const char* argv[]) {
              << endl;
         return 0;
     }
-
     string port = "8085";
     int colorWidth = 0;
     int colorHeight = 0;
@@ -735,18 +734,16 @@ int main(const int argc, const char* argv[]) {
         auto argVal = string(argv[i]);
         if (string("--disable-depth").compare(argVal) == 0) {
             disableDepth = true;
-            cerr << "depth has been disabled" << endl;
+
         } else if (string("--disable-color").compare(argVal) == 0) {
             disableColor = true;
-            cerr << "color has been disabled" << endl;
         } else if (string("--disable-motion").compare(argVal) == 0) {
             disableMotion = true;
-            cerr << "motion has been disabled" << endl;
         } else if (string("--debug").compare(argVal) == 0) {
             DEBUG = true;
         }
     }
-    
+
     if (disableColor && disableDepth && disableMotion) {
         cerr << "cannot disable motion, color and depth" << endl;
         return 1;
@@ -776,7 +773,6 @@ int main(const int argc, const char* argv[]) {
         cout << "depth_width:    " << pipeAndProps.properties.depth.width << alignedText << "\n";
         cout << "depth_height:   " << pipeAndProps.properties.depth.height << alignedText << endl;
     }
-    cout << "motion_enabled:  " << !disableMotion << endl;
 
     AtomicFrameSet latestFrames;
     promise<void> ready;
