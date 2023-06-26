@@ -402,16 +402,14 @@ class CameraServiceImpl final : public CameraService::Service {
     ::grpc::Status DoCommand(ServerContext *context, const DoCommandRequest *request,
                              DoCommandResponse *response) override
     {
-        cout << "making do command" << endl;
-        google::protobuf::Struct *motion;
         google::protobuf::Struct *result = response->mutable_result();
-        motion->mutable_fields()->operator[]("acc_x").set_number_value(motionData.accel_data.x);
-        motion->mutable_fields()->operator[]("acc_y").set_number_value(motionData.accel_data.y);
-        motion->mutable_fields()->operator[]("acc_z").set_number_value(motionData.accel_data.z);
+        result->mutable_fields()->operator[]("acc_x").set_number_value((double) motionData.accel_data.x);
+        result->mutable_fields()->operator[]("acc_y").set_number_value((double) motionData.accel_data.y);
+        result->mutable_fields()->operator[]("acc_z").set_number_value((double) motionData.accel_data.z);
 
-        motion->mutable_fields()->operator[]("gryo_x").set_number_value(motionData.gryo_data.x);
-        motion->mutable_fields()->operator[]("gryo_y").set_number_value(motionData.gryo_data.y);
-        motion->mutable_fields()->operator[]("gryo_z").set_number_value(motionData.gryo_data.z);
+        result->mutable_fields()->operator[]("gryo_x").set_number_value((double) motionData.gryo_data.x);
+        result->mutable_fields()->operator[]("gryo_y").set_number_value((double) motionData.gryo_data.y);
+        result->mutable_fields()->operator[]("gryo_z").set_number_value((double) motionData.gryo_data.z);
 
         return grpc::Status::OK;
     }
@@ -460,8 +458,6 @@ void frameLoop(rs2::pipeline pipeline, AtomicFrameSet& frameSet, promise<void>& 
             this_thread::sleep_for(failureWait);
             continue;
         }
-
-        cout << "# of color Frames: " << frames.size() << endl << endl;
 
         if (DEBUG) {
             auto stop = chrono::high_resolution_clock::now();
@@ -530,8 +526,8 @@ void motionLoop(rs2::pipeline pipeline, MotionData &motionData, promise<void> &r
 
         auto start = chrono::high_resolution_clock::now();
         
-        rs2::frameset frameset;         
-        bool succ = pipeline.try_wait_for_frames(&frameset, timeoutMillis);
+        rs2::frameset frames;         
+        bool succ = pipeline.try_wait_for_frames(&frames, timeoutMillis);
         if (!succ) {
             if (DEBUG) {
                 cerr << "[frameLoop] could not get frames from realsense after " << timeoutMillis
@@ -540,28 +536,23 @@ void motionLoop(rs2::pipeline pipeline, MotionData &motionData, promise<void> &r
             this_thread::sleep_for(failureWait);
             continue;
         }
-        cout << "# of motion Frames: " << frameset.size() << endl << endl;
+        
+        for (int i = 0; i < frames.size(); i++) {
+            auto motion = frames[i].as<rs2::motion_frame>();
 
-        auto motion = frameset.as<rs2::motion_frame>();
+            if (motion && motion.get_profile().stream_type() == RS2_STREAM_GYRO && motion.get_profile().format() == RS2_FORMAT_MOTION_XYZ32F) {
+                rs2_vector gyro_data = motion.get_motion_data();
+                motionData.mutex.lock();
+                motionData.gryo_data = gyro_data;
+                motionData.mutex.unlock();
+            }
 
-        if (motion && motion.get_profile().stream_type() == RS2_STREAM_GYRO && motion.get_profile().format() == RS2_FORMAT_MOTION_XYZ32F) {
-            double ts = motion.get_timestamp();
-            rs2_vector gyro_data = motion.get_motion_data();
-
-            motionData.mutex.lock();
-            motionData.gryo_data = gyro_data;
-            motionData.mutex.unlock();
-            cout << "Gyro data: " << gyro_data << endl;
-        }
-
-        if (motion && motion.get_profile().stream_type() == RS2_STREAM_ACCEL && motion.get_profile().format() == RS2_FORMAT_MOTION_XYZ32F) {
-            double ts = motion.get_timestamp();
-            rs2_vector accel_data = motion.get_motion_data();
-
-            motionData.mutex.lock();
-            motionData.accel_data = accel_data;
-            motionData.mutex.unlock();
-            cout << "accel data: " << accel_data << endl;
+            if (motion && motion.get_profile().stream_type() == RS2_STREAM_ACCEL && motion.get_profile().format() == RS2_FORMAT_MOTION_XYZ32F) {
+                rs2_vector accel_data = motion.get_motion_data();
+                motionData.mutex.lock();
+                motionData.accel_data = accel_data;
+                motionData.mutex.unlock();
+            }
         }
 
         if (!readyOnce){
@@ -783,10 +774,10 @@ int main(const int argc, const char* argv[]) {
 
     MotionData latestMotionData;
     promise<void> ready_motion;
-    thread motionThread(motionLoop, pipeAndProps.pipeline, ref(latestMotionData), ref(ready_motion));
-    cout << "waiting for motion loop thread to be ready..." << flush;
+    thread motionThread(motionLoop, pipeAndProps.motionPipeline, ref(latestMotionData), ref(ready_motion));
+    cout << "waiting for motion frame loop thread to be ready..." << flush;
     ready_motion.get_future().wait();
-    cout << " motion ready!" << endl;
+    cout << " ready!" << endl;
 
     RobotServiceImpl robotService;
     CameraServiceImpl cameraService(pipeAndProps.properties, latestFrames, latestMotionData, disableColor,
