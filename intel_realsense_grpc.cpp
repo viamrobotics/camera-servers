@@ -74,7 +74,7 @@ struct AtomicFrameSet {
 
 struct MotionData {
     std::mutex mutex;
-    rs2_vector gryo_data;
+    rs2_vector gyro_data;
     rs2_vector accel_data;
 };
 
@@ -90,6 +90,29 @@ const uint64_t depthMagicNumber =
 const size_t depthMagicByteCount = sizeof(uint64_t);   // number of bytes used to represent the depth magic number
 const size_t depthWidthByteCount = sizeof(uint64_t);   // number of bytes used to represent depth image width
 const size_t depthHeightByteCount = sizeof(uint64_t);  // number of bytes used to represent depth image height
+
+string base64_encode(const string &s)
+{
+    static const string base64_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    size_t i=0,ix=0,leng = s.length();
+    std::stringstream q;
+ 
+    for(i=0,ix=leng - leng%3; i<ix; i+=3)
+    {
+        q<< base64_chars[ (s[i] & 0xfc) >> 2 ];
+        q<< base64_chars[ ((s[i] & 0x03) << 4) + ((s[i+1] & 0xf0) >> 4)  ];
+        q<< base64_chars[ ((s[i+1] & 0x0f) << 2) + ((s[i+2] & 0xc0) >> 6)  ];
+        q<< base64_chars[ s[i+2] & 0x3f ];
+    }
+    if (ix<leng)
+    {
+        q<< base64_chars[ (s[ix] & 0xfc) >> 2 ];
+        q<< base64_chars[ ((s[ix] & 0x03) << 4) + (ix+1<leng ? (s[ix+1] & 0xf0) >> 4 : 0)];
+        q<< (ix+1<leng ? base64_chars[ ((s[ix+1] & 0x0f) << 2) ] : '=');
+        q<< '=';
+    }
+    return q.str();
+}
 
 // COLOR responses
 tuple<vector<uint8_t>, bool> encodeColorPNG(const uint8_t* data, const int width,
@@ -402,14 +425,45 @@ class CameraServiceImpl final : public CameraService::Service {
     ::grpc::Status DoCommand(ServerContext *context, const DoCommandRequest *request,
                              DoCommandResponse *response) override
     {
-        google::protobuf::Struct *result = response->mutable_result();
-        result->mutable_fields()->operator[]("acc_x").set_number_value((double) motionData.accel_data.x);
-        result->mutable_fields()->operator[]("acc_y").set_number_value((double) motionData.accel_data.y);
-        result->mutable_fields()->operator[]("acc_z").set_number_value((double) motionData.accel_data.z);
+        // const google::protobuf::Struct &cmd = request->command();
+        // cout << cmd.Value << endl;
 
-        result->mutable_fields()->operator[]("gryo_x").set_number_value((double) motionData.gryo_data.x);
-        result->mutable_fields()->operator[]("gryo_y").set_number_value((double) motionData.gryo_data.y);
-        result->mutable_fields()->operator[]("gryo_z").set_number_value((double) motionData.gryo_data.z);
+        google::protobuf::Struct *result = response->mutable_result();
+
+        // Motion
+        this->motionData.mutex.lock();
+        rs2_vector latestAccelData = motionData.accel_data;
+        rs2_vector latestGyroData = motionData.gyro_data;
+        this->motionData.mutex.unlock();
+
+        result->mutable_fields()->operator[]("acc_x").set_number_value((double) latestAccelData.x);
+        result->mutable_fields()->operator[]("acc_y").set_number_value((double) latestAccelData.y);
+        result->mutable_fields()->operator[]("acc_z").set_number_value((double) latestAccelData.z);
+
+        result->mutable_fields()->operator[]("gryo_x").set_number_value((double) latestGyroData.x);
+        result->mutable_fields()->operator[]("gryo_y").set_number_value((double) latestGyroData.y);
+        result->mutable_fields()->operator[]("gryo_z").set_number_value((double) latestGyroData.z);
+
+        // Camera
+        auto start = chrono::high_resolution_clock::now();
+
+        this->frameSet.mutex.lock();
+        auto latestColorFrame = this->frameSet.colorFrame;
+        auto latestDepthFrame = this->frameSet.depthFrame;
+        this->frameSet.mutex.unlock();
+
+        const auto& [encoded_color, ok_color] = encodeColorPNG((const uint8_t*)latestColorFrame.get_data(), this->props.color.width, this->props.color.height);
+        if (!ok_color) {
+            return grpc::Status(grpc::StatusCode::INTERNAL, "failed to encode color PNG");
+        }
+        result->mutable_fields()->operator[]("color").set_string_value(base64_encode(reinterpret_cast<const char*>(encoded_color.data())));
+
+        const auto& [encoded_depth, encoded_depth_size, ok_depth] = encodeDepthPNG((const unsigned char*)latestDepthFrame->data(), this->props.depth.width, this->props.depth.height);
+        if (!ok_depth) {
+            return grpc::Status(grpc::StatusCode::INTERNAL, "failed to encode depth PNG");
+        }
+        result->mutable_fields()->operator[]("depth").set_string_value(base64_encode(reinterpret_cast<const char*>(encoded_depth)));
+        std::free(encoded_depth);
 
         return grpc::Status::OK;
     }
@@ -436,7 +490,6 @@ class RobotServiceImpl final : public RobotService::Service {
 
 // align to the color camera's origin when color and depth enabled
 const rs2::align FRAME_ALIGNMENT = RS2_STREAM_COLOR;
-
 void frameLoop(rs2::pipeline pipeline, AtomicFrameSet& frameSet, promise<void>& ready,
                const bool disableColor, const bool disableDepth, float depthScaleMm) {
     bool readyOnce = false;
@@ -544,7 +597,7 @@ void motionLoop(rs2::pipeline pipeline, MotionData &motionData, promise<void> &r
             if (motion && motion.get_profile().stream_type() == RS2_STREAM_GYRO && motion.get_profile().format() == RS2_FORMAT_MOTION_XYZ32F) {
                 rs2_vector gyro_data = motion.get_motion_data();
                 motionData.mutex.lock();
-                motionData.gryo_data = gyro_data;
+                motionData.gyro_data = gyro_data;
                 motionData.mutex.unlock();
             }
 
