@@ -436,6 +436,7 @@ class RobotServiceImpl final : public RobotService::Service {
 
 // align to the color camera's origin when color and depth enabled
 const rs2::align FRAME_ALIGNMENT = RS2_STREAM_COLOR;
+
 void frameLoop(rs2::pipeline pipeline, AtomicFrameSet& frameSet, promise<void>& ready,
                const bool disableColor, const bool disableDepth, float depthScaleMm) {
     bool readyOnce = false;
